@@ -26,6 +26,8 @@ Linux 开发环境是 Debian 13 / x64 / Node 24.19.0。依赖与本地工具链�
 
 独立审查覆盖 Core/审批、Connection/组合、桌面和资产/目录。已验证的回归包括退出证据丢失、Object 原型工具名、认证检查期间撤销、缺账号元数据、Mac 临时目录祖先符号链接、版本冲突后重试。修复先观察失败再通过定向测试；最终全集验证不能由静态审查替代。
 
+首轮实际 Mac CI（[dc8c925 / run 38282149106](https://github.com/bill-liu/agent-nexus/actions/runs/38282149106)）运行于 macOS 15.7.9 / arm64：266 项逻辑测试与实际 `.app` 打包通过；Electron 安全测试为 6 通过 / 5 失败，因此后续 Mac 流程没有执行，该轮整体 **FAIL**。日志、失败 trace 和包 digest 已保留。失败涉及测试 Main 上下文的 `require`、未注册窗口探针、受阻导航与崩溃恢复观测；修复必须继续用实际包复验，不能用本地逻辑通过覆盖这一失败记录。
+
 原有 [Swift 工具链 smoke](../../.github/workflows/toolchain.yml) 保留独立，不用它代替上述 Electron 包验证。
 
 ## 未通过或尚未执行的门禁

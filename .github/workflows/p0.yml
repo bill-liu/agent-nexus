@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 24.19.0
           cache: npm
+      - run: npm install --global npm@11.9.0
       - run: npm ci
       - run: npm run preflight
       - run: npm run typecheck
@@ -35,16 +36,20 @@ jobs:
         with:
           node-version: 24.19.0
           cache: npm
+      - run: npm install --global npm@11.9.0
       - run: npm ci
       - run: npm run install:electron
       - run: npm run preflight -- --require-macos
       - run: npm run typecheck
       - run: npm test
-      - run: npm run package:mac
+      - id: package
+        run: npm run package:mac
       - name: Use exact packaged executable
+        id: package_path
         run: node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('out/package-evidence.json','utf8'));fs.appendFileSync(process.env.GITHUB_ENV, 'AN_PACKAGED_EXECUTABLE='+p.executable+'\nAN_APP_PATH='+p.appPath+'\n')"
       - run: npm run test:electron
-      - run: npm run test:mac
+      - if: ${{ !cancelled() && steps.package.outcome == 'success' && steps.package_path.outcome == 'success' }}
+        run: npm run test:mac
       - name: Retain P0 validation evidence (not a release)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
