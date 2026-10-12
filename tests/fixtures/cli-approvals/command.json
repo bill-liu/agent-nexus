@@ -1,0 +1,20 @@
+{
+  "id": 7,
+  "method": "item/commandExecution/requestApproval",
+  "params": {
+    "itemId": "command-item",
+    "threadId": "native-thread",
+    "turnId": "native-turn",
+    "startedAtMs": 90,
+    "command": "git status --short",
+    "cwd": "/sandbox/project",
+    "kind": "command",
+    "approvalId": null,
+    "commandActions": null,
+    "environmentId": null,
+    "networkApprovalContext": null,
+    "proposedExecpolicyAmendment": null,
+    "proposedNetworkPolicyAmendments": null,
+    "reason": "Inspect candidate"
+  }
+}

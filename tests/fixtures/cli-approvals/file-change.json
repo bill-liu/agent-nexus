@@ -1,0 +1,12 @@
+{
+  "id": "file-7",
+  "method": "item/fileChange/requestApproval",
+  "params": {
+    "itemId": "file-item",
+    "threadId": "native-thread",
+    "turnId": "native-turn",
+    "startedAtMs": 90,
+    "grantRoot": null,
+    "reason": "Update candidate"
+  }
+}

@@ -2,7 +2,7 @@
 
 面向目标、支持持续协作与可验证成长的 Bot Network。产品采用 **Electron 桌面 App，一期仅支持 macOS**；后续再扩展其他桌面客户端。
 
-**当前状态：完整设计已进入仓库，尚未实现产品 App。** 现有代码仍为基础环境检查与 macOS 工具链 smoke。下一步先完成 P0/P1 设计与工程对齐、实施计划和验收映射，再按批准的计划编码；不沿用旧 AN 的固定流程或数据模型，尚未选择开源许可证。
+**当前状态：按已批准的 v1.3 方向实现 P0 本地演示与契约。** Electron 外壳使用单一 Core、SQLite 和明确标注的 FakeRuntime；不会启动真实 CLI、登录账号或调用模型。实际通过与未执行项见 [P0 验证记录](docs/validation/p0-report.md)。P1 真实联调仍需可用的 Mac 验证目标、具名 Connection 授权及主线程确认。尚未选择开源许可证。
 
 ## 设计与 super bot 交接
 
@@ -26,7 +26,19 @@ bash scripts/check-toolchain.sh
 
 已有 SSH 授权时也可使用 `git@github.com:bill-liu/agent-nexus.git`；不需要为环境检查创建密钥或 secrets。基础要求为 Git、Bash 3.2+ 和系统常用命令。脚本不安装软件、不修改 Xcode 选择或全局配置。
 
-Linux 云端用于编辑、版本管理、脚本及后续可移植逻辑检查，不能代替真实 macOS 上的 Electron 窗口、输入法、签名、系统集成和 VM helper 验证。Linux 检查成功仅代表基础工具可用，输出会明确跳过 macOS 编译。可执行 `bash -n scripts/check-toolchain.sh` 检查脚本语法。当前无需在 Linux 安装 Swift 或产品依赖。
+Linux 云端用于编辑、版本管理及逻辑检查，不能代替真实 macOS 上的 Electron 窗口、输入法、签名、系统集成和 VM helper 验证。基础工具脚本在 Linux 明确跳过 macOS 编译，无需安装 Swift。
+
+P0 开发使用 Node 24.19.0、npm 11.9.0 和锁文件：
+
+```sh
+npm ci
+npm run preflight
+npm run typecheck
+npm test
+npm run build
+```
+
+在获准 Mac 上执行 `npm run install:electron`、`npm start` 可打开演示；`npm run package:mac` 生成未配置发布签名或公证的开发包。实际包测试需将输出 `out/package-evidence.json` 中的 `executable` 设为 `AN_PACKAGED_EXECUTABLE`，再执行 `npm run test:electron` 和 `npm run test:mac`。复现细节与平台阻塞见 [P0 preflight](docs/validation/p0-preflight.md)。
 
 ## 云端 macOS 工具链 smoke check
 
@@ -38,9 +50,9 @@ bash scripts/check-toolchain.sh --require-macos
 
 检查当前 Xcode、Swift 和 macOS SDK，并在自动清理的临时目录中编译、链接和运行一个导入 Foundation/AppKit 的最小 Swift 程序。**它仍是环境检查，不代表主界面选择 SwiftUI；也不代表 Electron App 构建、UI 测试、签名或发布通过。** 不打开 GUI、不需要开发者证书。
 
-工作流只使用只读 contents 权限和 runner 自带工具；checkout 固定到提交 SHA。runner 镜像会更新，日志记录镜像版本、Xcode 路径及版本、Swift 版本和 SDK 版本，方便复现问题。P0 再固定产品所需 Electron/Node/模块版本、正式发布架构和最低 macOS；runner 的系统版本不是 App 的最低系统承诺。
+工作流只使用只读 contents 权限和 runner 自带工具；checkout 固定到提交 SHA。runner 镜像会更新，日志记录镜像版本、Xcode 路径及版本、Swift 版本和 SDK 版本。P0 的依赖已固定，开发包验证基线暂为 macOS 15；未经实际检查的 CPU 架构或更早系统不计入支持范围。
 
-本次文档提交不修改 workflow 或工具脚本，不使用 larger runner、不配置账单或 secrets。未来改变资源、仓库可见性或 CI 方案时，先评估权限和费用。
+新增的 `p0.yml` 在标准 GitHub-hosted Linux/macOS runner 执行契约和实际 Electron 开发包测试；与 Swift smoke 分开报告。不使用 larger runner、不配置账单或 secrets，不发布 App。
 
 ## 后续 Mac 交互调试
 

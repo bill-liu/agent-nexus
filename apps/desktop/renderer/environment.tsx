@@ -1,0 +1,2 @@
+import type {BotView} from '../../../packages/contracts/src/events.js';
+export function Environment({bot}:{bot?:BotView}){return <section><h3>运行环境 · 演示</h3><dl><dt>目标 / 持久数据</dt><dd>{bot?`Fake Sandbox ${bot.sandboxId}`:'尚未选择 Bot'} · 本机演示数据库</dd><dt>期望状态</dt><dd>长期保留身份与工作队列</dd><dt>实际环境与 Runner</dt><dd>Fake adapter；未创建真实 VM / 远程节点，真实心跳未知</dd><dt>Runtime / 授权</dt><dd>Fake Runtime v0 · 真实 CLI 未启用 · 尚未登录</dd><dt>模板与下载</dt><dd>演示模板 v0 · 未连接公共资源服务，无下载百分比</dd></dl><p>任务结束保留身份；未启用真实环境维护、迁移与升级。</p></section>;}

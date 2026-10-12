@@ -1,0 +1,19 @@
+{
+  "id": 9,
+  "method": "item/permissions/requestApproval",
+  "params": {
+    "itemId": "command-item",
+    "threadId": "native-thread",
+    "turnId": "native-turn",
+    "startedAtMs": 90,
+    "cwd": "/sandbox/project",
+    "environmentId": null,
+    "permissions": {
+      "network": {
+        "enabled": true
+      },
+      "fileSystem": null
+    },
+    "reason": "Network access"
+  }
+}

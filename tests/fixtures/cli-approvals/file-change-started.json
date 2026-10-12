@@ -1,0 +1,23 @@
+{
+  "method": "item/started",
+  "params": {
+    "threadId": "native-thread",
+    "turnId": "native-turn",
+    "startedAtMs": 90,
+    "item": {
+      "id": "file-item",
+      "type": "fileChange",
+      "status": "inProgress",
+      "changes": [
+        {
+          "path": "/sandbox/project/a.ts",
+          "kind": {
+            "type": "update",
+            "move_path": null
+          },
+          "diff": "@@ -1 +1 @@\n-old\n+new\n"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,5 @@
+import {expect,it} from 'vitest';
+import {PendingNavigation} from '../../apps/desktop/main/navigation.js';
+it('retains a cold-start link until an authoritative snapshot is supplied',()=>{const navigation=new PendingNavigation();navigation.queue('agent-nexus://bot/owned');expect(navigation.take(undefined,'local-user')).toBeUndefined();expect(navigation.take([{id:'owned',owner:'local-user'}],'local-user')).toEqual({botId:'owned'});expect(navigation.take([{id:'owned',owner:'local-user'}],'local-user')).toBeUndefined();});
+it('unauthorized and missing objects never yield navigation',()=>{for(const bots of [[],[{id:'foreign',owner:'other'}]]){const navigation=new PendingNavigation();navigation.queue('agent-nexus://bot/foreign');expect(navigation.take(bots,'local-user')).toBeUndefined();}});
+it('malformed/action-bearing links cannot replace a queued valid link',()=>{const navigation=new PendingNavigation();navigation.queue('agent-nexus://bot/owned');expect(()=>navigation.queue('agent-nexus://bot/owned?action=cancel')).toThrow();expect(navigation.take([{id:'owned',owner:'local-user'}],'local-user')).toEqual({botId:'owned'});});

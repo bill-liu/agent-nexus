@@ -16,3 +16,12 @@ build/
 *.p8
 *.mobileprovision
 *.provisionprofile
+
+# P0 desktop dependencies, packages and local validation output
+node_modules/
+out/
+playwright-report/
+test-results/
+coverage/
+*.log
+.superpowers/

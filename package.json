@@ -1,0 +1,39 @@
+{
+  "name": "agent-nexus",
+  "version": "0.0.0-p0",
+  "private": true,
+  "description": "Agent Nexus macOS desktop P0 \u2014 fake runtimes only",
+  "type": "module",
+  "main": "build/main.cjs",
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "packageManager": "npm@11.9.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:logic": "vitest run",
+    "test:electron": "AN_TEST_SUITE=electron playwright test --config=playwright.config.ts tests/electron-security",
+    "test:mac": "AN_TEST_SUITE=mac playwright test --config=playwright.config.ts tests/macos-e2e",
+    "build": "node scripts/build.mjs",
+    "package:mac": "node scripts/package.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "start": "npm run build && electron .",
+    "install:electron": "install-electron"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@playwright/test": "1.64.0",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "electron": "44.7.0",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  }
+}

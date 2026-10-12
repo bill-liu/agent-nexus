@@ -1,0 +1,4 @@
+import type {BotView,Snapshot,RunView} from '../../../packages/contracts/src/events.js';
+export function Inbox({bot,snapshot,disabled,cancel}:{bot:BotView;snapshot:Snapshot;disabled:boolean;cancel:(run:RunView)=>void}){
+ const tasks=snapshot.tasks.filter(task=>task.botId===bot.id);return <div aria-label="持久队列"><h4>当前执行与待执行</h4>{tasks.length?tasks.map(task=>{const run=snapshot.runs.find(run=>run.taskId===task.id && run.slotHeld);return <article key={task.id}><p>{task.text}</p><p className="small">平台状态：{run?.state??task.status} · 来源：用户 · 演示 · Task {task.id.slice(0,8)}</p>{run&&<button disabled={disabled||['CANCEL_REQUESTED','INTERRUPT_REQUESTED','LOST','UNKNOWN'].includes(run.state)} onClick={()=>cancel(run)}>取消当前工作</button>}</article>;}):<p>队列为空，Bot 仍在，可以继续交工作。</p>}<p className="small">队列顺序不承诺开始时间。Fake 运行不会调用真实 CLI 或模型。</p></div>;
+}
