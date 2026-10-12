@@ -1,0 +1,18 @@
+# macOS and local Xcode state
+.DS_Store
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Generated Swift/build output (keep project files and Package.resolved trackable)
+.build/
+build/
+
+# Local configuration and signing material
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile

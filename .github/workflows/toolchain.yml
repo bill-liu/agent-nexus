@@ -1,0 +1,29 @@
+name: macOS toolchain smoke check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolchain-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  toolchain:
+    name: Toolchain only (not an app build)
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - name: Check script syntax
+        run: bash -n scripts/check-toolchain.sh
+      - name: Compile and run isolated macOS SDK probe
+        run: bash scripts/check-toolchain.sh --require-macos
