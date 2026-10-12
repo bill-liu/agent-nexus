@@ -6,12 +6,14 @@
 
 实施同时读取 [P0/P1 实施计划](docs/plans/p0-p1-implementation-plan.md) 和 [执行门禁及补充验收](docs/plans/p0-p1-execution-gates.md)。两者已落实 Issue #1 的 F01–F05 审查：启动依赖、最小独立验收前置、真实 CLI 双向审批、Mac/Connection 准入与实际执行点负向测试。它们细化实施要求，不替代 v1.3 产品方向。
 
+P0 之后的具体工作按 [P1 任务书](docs/plans/p1-task-brief.md) 拆分为无账号实现 P1-A 与具名环境真实联调 P1-B。先复用现有同步 fake、审批和连接资产，明确异步执行与真实证据接线；任务书的发布不自动授权访问用户 Mac、安装 VM、登录、调用模型或产生费用。设备/账号候选未确认时保持 UNCONFIRMED，不改写已有 P0 验证结果。
+
 ## 用户已确认边界
 
 - Electron 桌面 App，一期仅 Mac；不做 Web 主客户端/手机首发，不再要求 SwiftUI 主界面。
 - 一级入口：任务指挥台、Bots、成长；Orchestrator 也是 Bot。
 - 长期 Bot 绑定持久 Sandbox，任务结束不销毁；所有 Agent CLI 在 Sandbox 内运行。
-- 本地/远程执行同协议；资源 Server 管环境/模板/下载，不自动接管私有数据、账号或 Goal。
+- 本地/远程执行同协议；资源Server管环境/模板/下载，不自动接管私有数据、账号或 Goal。
 - 私有知识/Skill/规约/经验本地优先，版本化、按权限装载；硬约束由 Kernel/执行点落实。
 - 用户选 Connection 和费用来源，系统确定性解析；默认不跨计费来源切换、不绕过网关。
 - 厂商认证与再分发许可单独核验；不收集订阅 OAuth 做通用代理，不把“CLI 可运行”当成产品集成许可。
