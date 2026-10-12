@@ -22,7 +22,7 @@ Linux 开发环境是 Debian 13 / x64 / Node 24.19.0。依赖与本地工具链�
 
 2026-10-12 17:04:47 UTC，Linux 最终候选检查：`preflight`、`typecheck`、`npm test`（**19 文件 / 266 测试通过**）、`build`、`git diff --check` 均退出 0；fixture JSON 语法通过。原工具链脚本语法通过，Linux 执行正确报告 base PASS / macOS SKIP。这些结果没有覆盖真实 macOS GUI。
 
-标准 `macos-15` runner 在同一提交上重跑逻辑检查，生成实际 `.app` 并启动它执行 `test:electron` 与 `test:mac`。制品 `p0-macos-validation-<SHA>` 保存包内 `app.asar` SHA-256、源码 SHA、dirty 标志、OS/架构/Electron 版本和独立的 Electron/Mac Playwright 结果、失败截图与 trace。该开发包没有发布签名或公证；不是发行验证。CI 首次运行前不预填成功，提交交付回执提供实际完成状态与链接。
+标准 `macos-15` runner 在同一提交上重跑逻辑检查，生成实际 `.app` 并启动它执行 `test:electron` 与 `test:mac`。制品 `p0-macos-validation-<SHA>` 保存包内 `app.asar` SHA-256、源码 SHA、dirty 标志、OS/架构/Electron 版本和独立的 Electron/Mac Playwright 结果、失败截图与 trace。该开发包没有发布签名或公证；不是发行验证。各轮实际结果及最终成功证据记录如下，成功结论仅绑定对应提交和已执行的检查。
 
 独立审查覆盖 Core/审批、Connection/组合、桌面和资产/目录。已验证的回归包括退出证据丢失、Object 原型工具名、认证检查期间撤销、缺账号元数据、Mac 临时目录祖先符号链接、版本冲突后重试。修复先观察失败再通过定向测试；最终全集验证不能由静态审查替代。
 
@@ -30,7 +30,21 @@ Linux 开发环境是 Debian 13 / x64 / Node 24.19.0。依赖与本地工具链�
 
 第二轮（[7316ff3 / run 38283068644](https://github.com/bill-liu/agent-nexus/actions/runs/38283068644)）再次通过构建和 266 项逻辑测试，**11 项 Electron 安全/恢复测试全部通过**，Mac 流程 5 通过 / 1 失败；剩余为最后窗口关闭后的测试驱动连接失效，仍记整体 FAIL，继续验证真实 App 生命周期。
 
-原有 [Swift 工具链 smoke](../../.github/workflows/toolchain.yml) 保留独立，不用它代替上述 Electron 包验证。
+第三轮（[6667ec5 / run 38284191622](https://github.com/bill-liu/agent-nexus/actions/runs/38284191622)）已于 2026-10-12 完成，整体 **SUCCESS**。核对工作流 `head_sha` 与包内源码记录均为 `6667ec5a5166a7395007293faefca2f5f1e9f994`，`dirty: false`。实际结果为：
+
+| 检查 | 第三轮结果 |
+|---|---|
+| Linux 与 macOS 逻辑检查 | 两个 job 均成功；macOS 日志记录 **19 文件 / 266 测试通过**，typecheck 通过 |
+| 实际 macOS 开发包 | macOS **15.7.9 / arm64**，Electron **44.7.0**；`.app` 打包通过，并使用该包的实际可执行文件运行后续测试 |
+| Electron 安全与恢复 | **11 / 11 通过**，包括 Core/Renderer 崩溃、IPC/窗口权限、导航与资料预览边界 |
+| Mac 流程 | **6 / 6 通过**，包括最后窗口关闭后的真实零窗口、同一 Core 存活及产品 `activate` 恢复；测试未额外注册用于保活的 `window-all-closed` 监听器 |
+
+[第三轮验证制品](https://github.com/bill-liu/agent-nexus/actions/runs/38284191622/artifacts/11762372787)（ID `11762372787`，配置保留 7 天）包含 `package-evidence.json` 和独立测试报告；以下摘要来自该轮日志：
+
+- `app.asar` SHA-256：`74e3d65972768b7ed92697a4b8704427073b6e436141058d468b9e0631dc5171`。
+- 验证制品 ZIP SHA-256：`07261bdeb263f08a99b2358958431e2330a6c78244109bb0282d737fff694301`。
+
+原有 [Swift 工具链 smoke](../../.github/workflows/toolchain.yml) 保留独立；同一提交的 [run 38284191680](https://github.com/bill-liu/agent-nexus/actions/runs/38284191680) 已完成 **SUCCESS**，不以此代替上述 Electron 包验证。第三轮自动化成功不改变下列 UID map、人工 Mac 与 P1 门禁状态。
 
 ## 未通过或尚未执行的门禁
 
