@@ -3,6 +3,12 @@ test('Core crash preserves cached facts and disables dangerous writes',async()=>
  const {app,page,cleanup}=await launchPackaged();
  try {
   await expect(page.getByTestId('core-status')).toContainText('SQLite');
+  await page.getByLabel('Bot 名称').fill('缓存演示');
+  await page.getByRole('button',{name:'创建演示 Bot'}).click();
+  await expect(page.getByRole('heading',{name:'缓存演示',exact:true})).toBeVisible();
+  await page.getByLabel('Bot 名称').fill('故障后不可创建');
+  await expect(page.getByRole('button',{name:'创建演示 Bot'})).toBeEnabled();
+  const before=await page.evaluate(()=>(window as any).an.snapshot());
   await app.evaluate(({app})=>{
    const metrics=app.getAppMetrics();const core=metrics.find(metric=>metric.name==='AN Core');
    if(!core)throw Error(`Core utility process missing: ${JSON.stringify(metrics.map(metric=>({name:metric.name,type:metric.type,pid:metric.pid})))}`);
@@ -11,6 +17,8 @@ test('Core crash preserves cached facts and disables dangerous writes',async()=>
   await expect(page.getByTestId('core-status')).toContainText('只读');
   await expect(page.getByRole('button',{name:'创建演示 Bot'})).toBeDisabled();
   expect((await app.evaluate(({app})=>app.getAppMetrics())).filter(metric=>metric.name==='AN Core').length).toBe(0);
+  const after=await page.evaluate(()=>(window as any).an.snapshot());
+  expect(after.available).toBe(false);expect(after.bots).toEqual(before.bots);expect(after.epoch).toBe(before.epoch);
  } finally {await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();}
 });
 test('renderer crash restores scoped draft without repeating business submission',async()=>{
@@ -18,8 +26,13 @@ test('renderer crash restores scoped draft without repeating business submission
  try {
   await page.getByLabel('Bot 名称').fill('恢复演示');
   await page.getByRole('button',{name:'创建演示 Bot'}).click();
+  await page.getByLabel('交新工作').fill('崩溃前已受理任务');
+  await page.getByRole('button',{name:'提交到队列'}).click();
+  await expect(page.getByText('崩溃前已受理任务',{exact:true})).toBeVisible();
   await page.getByLabel('交新工作').fill('未提交草稿');
   const before=await page.evaluate(()=>(window as any).an.snapshot());
+  expect(before.tasks.length).toBe(1);
+  const expectedURL=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0]!.webContents.getURL());
   const recovered=await app.evaluate(async({BrowserWindow})=>{
    const wc=BrowserWindow.getAllWindows()[0]!.webContents;const oldPid=wc.getOSProcessId();
    const loaded=new Promise<void>((resolve,reject)=>{
@@ -30,11 +43,11 @@ test('renderer crash restores scoped draft without repeating business submission
    return {crashed:wc.isCrashed(),oldPid,newPid:wc.getOSProcessId(),windowId:wc.id,url:wc.getURL()};
   });
   expect(recovered.crashed).toBe(false);expect(recovered.newPid).not.toBe(recovered.oldPid);
-  expect(recovered.windowId).toBe(before.windowId);
+  expect(recovered.windowId).toBe(before.windowId);expect(recovered.url).toBe(expectedURL);
   // Playwright's old CRSession remains marked crashed. Verify the recovered renderer via Main.
   await expect.poll(()=>app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0]!.webContents.executeJavaScript('document.getElementById("work-composer")?.value ?? null'))).toBe('未提交草稿');
   const after=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0]!.webContents.executeJavaScript('window.an.snapshot()'));
-  expect(after.available).toBe(true);expect(after.epoch).toBe(before.epoch);expect(after.tasks.length).toBe(before.tasks.length);
+  expect(after.available).toBe(true);expect(after.epoch).toBe(before.epoch);expect(after.tasks).toEqual(before.tasks);
  } finally {await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();}
 });
 test('quit confirmation blocks admissions and cancellation restores the same authority',async()=>{const {app,page,cleanup}=await launchPackaged();try{await expect(page.getByTestId('core-status')).toContainText('SQLite');const first=await page.evaluate(()=>(window as any).an.snapshot());await page.evaluate(()=>(window as any).an.requestQuit('begin'));await expect(page.getByRole('button',{name:'取消退出',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'创建演示 Bot'})).toBeDisabled();await page.getByRole('button',{name:'取消退出',exact:true}).click();await expect(page.getByRole('button',{name:'取消退出',exact:true})).toHaveCount(0);expect((await page.evaluate(()=>(window as any).an.snapshot())).epoch).toBe(first.epoch);}finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();}});

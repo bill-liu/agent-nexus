@@ -28,6 +28,8 @@ Linux 开发环境是 Debian 13 / x64 / Node 24.19.0。依赖与本地工具链�
 
 首轮实际 Mac CI（[dc8c925 / run 38282149106](https://github.com/bill-liu/agent-nexus/actions/runs/38282149106)）运行于 macOS 15.7.9 / arm64：266 项逻辑测试与实际 `.app` 打包通过；Electron 安全测试为 6 通过 / 5 失败，因此后续 Mac 流程没有执行，该轮整体 **FAIL**。日志、失败 trace 和包 digest 已保留。失败涉及测试 Main 上下文的 `require`、未注册窗口探针、受阻导航与崩溃恢复观测；修复必须继续用实际包复验，不能用本地逻辑通过覆盖这一失败记录。
 
+第二轮（[7316ff3 / run 38283068644](https://github.com/bill-liu/agent-nexus/actions/runs/38283068644)）再次通过构建和 266 项逻辑测试，**11 项 Electron 安全/恢复测试全部通过**，Mac 流程 5 通过 / 1 失败；剩余为最后窗口关闭后的测试驱动连接失效，仍记整体 FAIL，继续验证真实 App 生命周期。
+
 原有 [Swift 工具链 smoke](../../.github/workflows/toolchain.yml) 保留独立，不用它代替上述 Electron 包验证。
 
 ## 未通过或尚未执行的门禁
