@@ -6,6 +6,8 @@ for (const [entry, name] of [
   ['apps/desktop/main/index.ts', 'main'],
   ['apps/desktop/preload/index.ts', 'preload'],
   ['apps/desktop/core-worker/entry.ts', 'core-worker'],
+  ['packages/desktop-platform/src/macos-secrets.ts', 'macos-secrets'],
+  ['packages/desktop-platform/src/secrets.ts', 'protected-secrets'],
 ]) {
   await build({ entryPoints: [entry], outfile: `build/${name}.cjs`, bundle: true,
     platform: 'node', format: 'cjs', target: 'node24', external: ['electron', 'node:*'], sourcemap: false });

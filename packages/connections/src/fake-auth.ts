@@ -1,12 +1,16 @@
-import { deny, type AuthInspection, type ResolveRequest } from './types.js';
-export type AuthTarget = Pick<ResolveRequest, 'botId' | 'nodeId' | 'generation' | 'runtime'>;
+import { deny, type AuthInspection, type AuthTarget } from './types.js';
+export type { AuthTarget } from './types.js';
 function targetKey(t: AuthTarget): string { return JSON.stringify([t.botId, t.nodeId, t.generation, t.runtime]); }
 export function projectAuth(i: AuthInspection): AuthInspection {
   return { status: i.status, authMethod: i.authMethod, ...(i.accountRef ? { accountRef: i.accountRef } : {}), billingSource: i.billingSource,
+    ...(i.executionBinding ? { executionBinding: { nodeId: i.executionBinding.nodeId, sandboxId: i.executionBinding.sandboxId, generation: i.executionBinding.generation,
+      transportInstanceId: i.executionBinding.transportInstanceId, processInstanceId: i.executionBinding.processInstanceId, runId: i.executionBinding.runId,
+      fencingToken: i.executionBinding.fencingToken, sessionId: i.executionBinding.sessionId, turnId: i.executionBinding.turnId } } : {}), ...(i.observedAt !== undefined ? { observedAt: i.observedAt } : {}),
     billingEvidence: i.billingEvidence, authSessionRef: i.authSessionRef, nodeId: i.nodeId, botId: i.botId, generation: i.generation, runtime: i.runtime, expiresAt: i.expiresAt };
 }
 /** No host cache, CLI, network, subscription token, or real authentication access. */
 export class FakeAuthAdapter {
+  readonly evidenceKind = 'fake' as const;
   private inspections = new Map<string, AuthInspection>();
   beginCount = 0; lastEnvironment: Record<string, string> = {}; onInspect?: () => unknown;
   setInspection(target: AuthTarget, metadata: AuthInspection): void { this.inspections.set(targetKey(target), projectAuth(metadata)); }

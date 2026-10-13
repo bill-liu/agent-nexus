@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-export interface ProtectedSecretSink { readonly storage: 'fake'; isAvailable(): boolean; put(reference: string, bytes: Uint8Array): void; remove(reference: string): void; }
+export type SecretStorageBackend = 'fake' | 'macos_safe_storage';
+export interface ProtectedSecretSink { readonly storage: SecretStorageBackend; isAvailable(): boolean; put(reference: string, bytes: Uint8Array): void; remove(reference: string): void; }
+/** Trusted Main/Node capability. Never expose this source over Renderer IPC. */
+export interface ExecutionSecretSource extends ProtectedSecretSink { readForExecution(reference: string): Uint8Array; }
 /** Test fixture only. Never substitutes for Keychain/safeStorage in a real credential workflow. */
 export class FakeSecretVault implements ProtectedSecretSink {
   readonly storage = 'fake' as const; #secrets = new Map<string, Uint8Array>();
@@ -11,7 +14,7 @@ export class FakeSecretVault implements ProtectedSecretSink {
 /** Accepts ephemeral bytes on the dedicated trusted platform channel; exposes no plaintext retrieval. */
 export class SecretBroker {
   constructor(private vault: ProtectedSecretSink) {}
-  save(bytes: Uint8Array): { credentialRef: string; status: 'stored'; storage: 'fake' } {
+  save(bytes: Uint8Array): { credentialRef: string; status: 'stored'; storage: SecretStorageBackend } {
     try {
       if (!this.vault.isAvailable()) throw new Error('SECRET_STORAGE_UNAVAILABLE');
       if (bytes.length === 0 || bytes.length > 16384) throw new Error('SECRET_INPUT_INVALID');
