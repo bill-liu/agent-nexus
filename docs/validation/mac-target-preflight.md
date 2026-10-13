@@ -17,3 +17,7 @@
 | 用户 Mac 接入 / VM 启动 / CLI 初始化 | NOT_RUN；P1-B 授权未确认 |
 
 获准后先只读探测实际系统，再按单独获准范围下载、安装和启动。保持原 Bot/operation，记录同一源码及包摘要。每次实际检查记录命令、退出码、脱敏证据路径、测试者及时间。不得公开家庭地址、IP、主机接入凭据或账号邮箱。人工项另见 [P0 Mac 清单](p0-manual-mac-checklist.md)，不能从自动 CI 填 PASS。
+
+## 独立的标准 CI 包记录
+
+这不是用户设备准入：代码候选 `2b187c74fea7b91d9cc30508197c78cb00b6dd5b` 在标准 runner macOS 15.7.9 / arm64、Electron 44.7.0 通过实际包自动化。包摘要与 7 天验证产物见 [P1 验证记录](p1-report.md#已验证的-p1-a-代码候选)。原表具名目标、用户 GUI/VM 与人工字段仍 UNCONFIRMED/NOT_RUN；不得把标准 runner 等同于 Mac mini M4 或嵌套虚拟化就绪。

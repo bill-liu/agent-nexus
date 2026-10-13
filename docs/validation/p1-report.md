@@ -93,3 +93,18 @@ Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/ag
 收尾提交 [`93be4ba`](https://github.com/bill-liu/agent-nexus/commit/93be4bad41073b21406a62774645b836fcf183fd)：[native canary](https://github.com/bill-liu/agent-nexus/actions/runs/38344825855) **15/15 SUCCESS**，helper/smoke 也成功。[实际包 CI](https://github.com/bill-liu/agent-nexus/actions/runs/38344825861) Linux/Mac 逻辑均 524/524、Electron 11/11、Mac 8 通过/1 失败。唯一失败是 packaged compiler spawn ENOTDIR；esbuild 缓存加载时 cwd，而 ASAR 不是物理目录。本次给 Core utilityProcess 显式设置本机 dataDirectory cwd，canary 在相同物理 cwd 加载编译器，保留“不执行候选”的断言。该包 dirty:false，app.asar SHA256 `61cd682f4273a45297bacd7297bdaf2557ae58689e0167d0a86e308d32643d6a`；失败包不作为最终合格候选。
 
 物理 cwd 修正候选 `6a7e75b` 的 [Mac 包 CI](https://github.com/bill-liu/agent-nexus/actions/runs/38345342555) 仍为相同 compiler ENOTDIR；该第一次 cwd 假设没有修复根因。检查已安装 ASAR 实现发现 `unpack` 匹配绝对文件名，旧相对 glob 未匹配，因此编译器根本未物理展开。新增跨平台真实 ASAR 合成归档测试先观察展开标记缺失（RED），再将共享打包策略改为按相对目录匹配的 `unpackDir`；不更换 esbuild，不放宽 canary。保留显式物理 cwd，待后续实际 Mac 包确认。
+
+## 已验证的 P1-A 代码候选
+
+[`2b187c74fea7b91d9cc30508197c78cb00b6dd5b`](https://github.com/bill-liu/agent-nexus/commit/2b187c74fea7b91d9cc30508197c78cb00b6dd5b) 的四组标准 CI 全部 **SUCCESS**：
+
+| 检查 | 同 SHA 实际结果与链接 |
+|---|---|
+| Linux + 实际 Mac Electron 包 | [38345952620](https://github.com/bill-liu/agent-nexus/actions/runs/38345952620)：两平台 typecheck/逻辑各 43 文件、525 项；build/package 成功；实际包 Electron 11/11、Mac 9/9（含 P1 准备队列/重载、真实 safeStorage 合成 canary、物理展开编译器的文本转换） |
+| 原生独立调用边界 | [38345952624](https://github.com/bill-liu/agent-nexus/actions/runs/38345952624)：15/15 固定合成对照；正确 A/B 正例、错误/伪造观察/篡改 intrinsics 负例与无宿主桥/CPU 终止通过 |
+| Swift helper | [38345952684](https://github.com/bill-liu/agent-nexus/actions/runs/38345952684)：build、7 项策略测试及只读 preflight 成功；没有 VM 启动证明 |
+| 工具链 | [38345952661](https://github.com/bill-liu/agent-nexus/actions/runs/38345952661)：临时 Foundation/AppKit 编译/运行成功；不是 App/VM live 门禁 |
+
+实际开发包：macOS **15.7.9 / arm64**，Electron **44.7.0**，phase **P1-A**，`dirty:false`。app.asar SHA256：`18e8981780c03361e49bea277bf4473596a5adc5fea5a11ac4c4ef40834e8daa`。验证产物 ID **11788264984**，归档 SHA256 **9effb0bc9c966cb7c70a5672716e65b250295afb617e2e4cc5f9e45ec516862a**，有效至 **2026-10-20 04:21:27 UTC**；[工作流产物页](https://github.com/bill-liu/agent-nexus/actions/runs/38345952620#artifacts)。它是测试报告/包摘要，不是签名发行 App。
+
+根 Linux 最终也为 43 文件/525 项、typecheck/build/diff 退出 0。A1–A6 实现和无账号验证材料已提交，P0 历史证据保留。前述未完成独立复审、未支持实现路径以及全部 P1-B/live/人工项仍保持相应状态，不能因 CI 绿而改为 PASS；**P1 整体未完成**。本次仅追加验证记录；后续记录提交仍需检查自己的 CI，其包摘要以该 run 的 package-evidence 为准，不冒用本段代码候选的摘要。
