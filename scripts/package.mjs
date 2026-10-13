@@ -1,3 +1,4 @@
+import {compilerAsarOptions} from './package-policy.mjs';
 import { packager } from '@electron/packager';
 import { readFile, mkdir, cp, writeFile, mkdtemp } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -19,7 +20,7 @@ await cp('node_modules/esbuild',join(staging,'node_modules/esbuild'),{recursive:
 await cp(`node_modules/@esbuild/darwin-${arch}`,join(staging,`node_modules/@esbuild/darwin-${arch}`),{recursive:true});
 await writeFile(join(staging, 'package.json'), JSON.stringify({name:pkg.name,version:pkg.version,main:'build/main.cjs',private:true}));
 const output = await packager({dir:staging,name:'Agent Nexus',platform:'darwin',arch,
-  electronVersion:pkg.devDependencies.electron,out:'out',overwrite:true,asar:{unpack:'{node_modules/esbuild/**,node_modules/@esbuild/**}'},
+  electronVersion:pkg.devDependencies.electron,out:'out',overwrite:true,asar:compilerAsarOptions,
   prune:false,appBundleId:'dev.agentnexus.p0',appVersion:'0.0.0',
   protocols:[{name:'Agent Nexus',schemes:['agent-nexus']}],
   extendInfo:{LSMinimumSystemVersion:'15.0'},
