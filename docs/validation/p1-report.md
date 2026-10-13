@@ -22,6 +22,8 @@
 
 新增 Swift Virtualization helper 源码、7 项策略单测和标准 `macos-15` 编译工作流。此切片经过独立代码审查后提交用于取得编译证据；Linux 环境没有 Swift/macOS SDK，尚不能据此宣称编译或 VM 运行通过。工作流只 build/test 和只读 `--preflight`，不分配 VM 磁盘、不下载 ISO、不启动 VM、不签名、不登录。
 
+首次候选 `c4a74cbfc105d4323a6b9e9c998946ef8e3a2153` 的 [helper CI](https://github.com/bill-liu/agent-nexus/actions/runs/38326337505) 在 Swift 6.1.2 编译失败：`VZVirtioSocketDevice.connect` 接收单个 `Result<VZVirtioSocketConnection, Error>`，而代码误用了双参数回调，故单测和 preflight 未运行。后续修正只调整该回调的取值方式，等待同 SHA CI 验证。该首次候选的 [Electron 回归](https://github.com/bill-liu/agent-nexus/actions/runs/38326337353) 和 [工具链 smoke](https://github.com/bill-liu/agent-nexus/actions/runs/38326337330) 成功，不替代 helper 编译结果。
+
 受保护配置控制生命周期与可选 NAT；默认没有网卡。授权过期后仍可查看和停止已拥有的实例；私有 Unix/vsock 桥在所有复制线程退出后才关闭描述符。真实主机重启后可核对 kernel boot UUID，恢复旧实例的停止状态。**同一次主机启动内 helper 崩溃后的实例仍保持 UNKNOWN**；尚无无须主机重启的完整恢复证明。此限制和桥并发/真实 VM 检查仍属于未关闭的 A3/B1/B3 项，不把编译通过算生命周期通过。
 
 - A2–A6 正在各独立工作树实现/集成，未在此切片宣称完成。

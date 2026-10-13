@@ -229,9 +229,9 @@ final class Host {
             case "connect":
                 guard let machine = machines[request.sandboxId], machine.state == .running,
                       let device = machine.socketDevices.first as? VZVirtioSocketDevice else { throw HostFailure("BLOCKED_NODE_CHANNEL_UNAVAILABLE") }
-                device.connect(toPort: 47001) { connection, error in
+                device.connect(toPort: 47001) { result in
                     do {
-                        guard let connection, error == nil else { throw HostFailure("BLOCKED_NODE_CHANNEL_UNAVAILABLE") }
+                        let connection = try result.get()
                         self.bridges.removeValue(forKey: request.sandboxId)?.close()
                         let path = URL(fileURLWithPath: self.authority.root).appendingPathComponent("channel-" + UUID().uuidString + ".sock").path
                         self.bridges[request.sandboxId] = try SocketBridge(path: path, guest: connection)
