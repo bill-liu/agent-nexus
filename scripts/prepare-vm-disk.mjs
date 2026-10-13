@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // B1-only conversion of an already downloaded and verified cloud image. No network or VM launch.
-import { lstatSync, realpathSync, readFileSync, createReadStream, mkdirSync, existsSync, renameSync, statSync } from 'node:fs';
+import { lstatSync, realpathSync, readFileSync, createReadStream, mkdirSync, existsSync, linkSync, unlinkSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -21,6 +21,8 @@ try {
  const raw=join(staging,'disk.raw');
  execFileSync(config.qemuImg,['convert','-f','qcow2','-O','raw',realpathSync(image),raw],{env:{PATH:'/usr/bin:/bin',LANG:'C'},stdio:'pipe',killSignal:'SIGKILL',timeout:Math.min(600000,authorizeNow()),maxBuffer:65536});
  execFileSync(config.qemuImg,['resize','-f','raw',raw,String(config.diskBytes)],{env:{PATH:'/usr/bin:/bin',LANG:'C'},stdio:'pipe',killSignal:'SIGKILL',timeout:Math.min(60000,authorizeNow()),maxBuffer:65536});
- if(statSync(raw).size!==config.diskBytes)throw new Error('DISK_SIZE_MISMATCH');authorizeNow();renameSync(raw,config.destination);
+ if(statSync(raw).size!==config.diskBytes)throw new Error('DISK_SIZE_MISMATCH');authorizeNow();
+ // Same-filesystem exclusive publication: a destination appearing during conversion is retained.
+ try{linkSync(raw,config.destination);}catch(error){if(error.code==='EEXIST')throw new Error('DISK_DESTINATION_DENIED');throw error;}unlinkSync(raw);
  console.log(JSON.stringify({status:'DISK_PREPARED',operationId:config.operationId,sourceSHA256:pinned,diskSHA256:await hash(config.destination),vmStarted:false,guestNodeInstalled:false}));
 } catch(error){console.log(JSON.stringify({status:'BLOCKED',reason:/^[A-Z_]+$/.test(error.message)?error.message:'DISK_PREPARATION_FAILED',vmStarted:false}));process.exit(2);}

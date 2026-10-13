@@ -19,6 +19,10 @@ For a preinstalled disk, the separately pinned Ubuntu Noble ARM64 cloud image is
 
 Both checksum entries and the ARM64 release pages were read from Canonical's public HTTPS sites on 2026-10-13. Only metadata was retrieved. The source pin is not a claim of PGP signature verification or of boot compatibility. Canonical's [IP policy](https://canonical.com/legal/intellectual-property-policy) and each installed component's `/usr/share/doc/*/copyright` apply. The recipe is for an unmodified local installation; redistribution and bundled third-party CLI permission remain separate reviews. No new project license is chosen.
 
+## N2 supervised preparation recipe
+
+See [the single cloud-image preparation runbook](../../docs/validation/p1-bootstrap-runbook.md) for concrete build/Mac/guest steps, fixed Node/Codex metadata, protected configuration, exclusive destination publication and failure handling. The current desktop installed factory still lacks first create/start on its own helper transport; do not start a separate helper and assume it can be adopted by another. The accountless script remains a prerequisite gate.
+
 ## B1 sequence, after named target authorization
 
 1. Run `node scripts/mac-vm-preflight.mjs` on the authorized ARM64 Mac. This only observes OS/toolchain information. Standard CI may build/test the Swift package; it does not start a VM or establish a user-device grant.

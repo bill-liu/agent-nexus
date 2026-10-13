@@ -9,13 +9,18 @@ export function readProtectedJSON<T>(path:string):T {
  return JSON.parse(readFileSync(path,'utf8')) as T;
 }
 export interface NodeListenConfig {socketPath:string;keyPath:string;binding:NodeChannelBinding;expiresAt:number}
-export function listenNode(configPath:string,compose:(stream:Socket,key:Buffer,binding:NodeChannelBinding)=>()=>void) {
+/** Read-only admission validation, reusable before guest storage is opened. */
+export function readNodeListenConfig(configPath:string):NodeListenConfig {
  const config=readProtectedJSON<NodeListenConfig>(configPath);
- if(process.platform!=='linux'||config.expiresAt<=Date.now()||!config.socketPath.startsWith('/run/an-node/'))throw new Error('BLOCKED_NODE_AUTHORIZATION');
+ if(process.platform!=='linux'||!config||Object.keys(config).length!==4||!Number.isSafeInteger(config.expiresAt)||config.expiresAt<=Date.now()||typeof config.socketPath!=='string'||!config.socketPath.startsWith('/run/an-node/')||typeof config.keyPath!=='string'||!config.binding||Object.keys(config.binding).length!==4||!['nodeId','sandboxId','transportInstanceId'].every(k=>typeof config.binding[k as keyof NodeChannelBinding]==='string'&&String(config.binding[k as keyof NodeChannelBinding]).length>0)||!Number.isSafeInteger(config.binding.generation)||config.binding.generation<1)throw new Error('BLOCKED_NODE_AUTHORIZATION');
  const directory=dirname(config.socketPath),parent=lstatSync(directory);
  if(!parent.isDirectory()||parent.isSymbolicLink()||(parent.mode&0o077)!==0||parent.uid!==process.getuid?.()||realpathSync(directory)!==directory)throw new Error('NODE_PRIVATE_SOCKET_REQUIRED');
  const secret=readProtectedJSON<{keyBase64:string}>(config.keyPath);const key=Buffer.from(secret.keyBase64,'base64');
- if(key.length!==32||key.toString('base64')!==secret.keyBase64)throw new Error('NODE_CHANNEL_AUTH_REQUIRED');
+ const valid=key.length===32&&key.toString('base64')===secret.keyBase64;key.fill(0);if(!valid)throw new Error('NODE_CHANNEL_AUTH_REQUIRED');return structuredClone(config);
+}
+export function listenNode(configPath:string,compose:(stream:Socket,key:Buffer,binding:NodeChannelBinding)=>()=>void) {
+ const config=readNodeListenConfig(configPath),secret=readProtectedJSON<{keyBase64:string}>(config.keyPath),key=Buffer.from(secret.keyBase64,'base64');
+ if(key.length!==32||key.toString('base64')!==secret.keyBase64){key.fill(0);throw new Error('NODE_CHANNEL_AUTH_REQUIRED');}
  let closeCurrent:(()=>void)|undefined;
  const server=createServer(stream=>{
   if(config.expiresAt<=Date.now()||closeCurrent){stream.destroy();return;}

@@ -142,3 +142,21 @@ Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/ag
 GPT6.1-SOL high 串行独立 A2、A3、A5 收尾完成；范围、实证失败/补丁复验、根自验和独立证据分别记于 [关键复审记录](p1-critical-review.md)。A5原stdout问题在固定原生边界关闭，原必需文件问题在v2结构范围关闭；现有5files44/44与同SHA原生15/15为独立证据。首轮内容安全中断后仅完成收窄只读检查，不宣称任意不可信JS通用安全。CHANGELOG保证收窄为UTF-8解码文本prefix，硬RAM仍未证明。
 
 A3同启动崩溃恢复仍UNKNOWN/B3阻塞，guest自主关机后的machine退休需获准Mac实测。N2、B/live和人工Mac未执行；任意模型候选仍受资源/隔离/具名授权门禁阻塞。脱敏填写项集中在 [最小具名B表](p1-critical-review.md#后续-b-的最小具名授权表)，不会收集公开秘密或自动启动设备操作。**P1整体未完成。**
+
+## N2：受监督首装准备与入口边界
+
+基点 `6ed0b65`；[首装 runbook](p1-bootstrap-runbook.md)固定 Noble release-20260926 qcow2→raw→具名 ARM64 Linux 离线chroot配置→Mac交接。文档给出源码/制品/签名与摘要层级、固定Node24.19/Codex0.159.2元数据、包锁首次捕获与缓存精确重放、公开rootfs/Node/gate/bridge目录、失效配置、已有目标/中断操作和准入。当前未产出真实package-lock/imageBOM或已验签安装盘，不把conditional recipe写为已复现安装。
+
+实际最小修复：disk排他link发布，转换期间出现的目标原字节保留；guest初始listen/key/policy、authority目标/期限/actions与只读NodeController/journal准入在Runner DB副作用之前。原4条失败回归RED→GREEN；独立审查另发现I-N2-01 policy与installed只读校验冲突、I-N2-02整archive解包与Node正常链接冲突、I-N2-03管理journal校验仍在DB之后；根一次fix pass修文档并新增journal/authority失败回归，观察RED→GREEN。源码修复没有引入VM/CLI启动入口。
+
+| 验证来源 | 实际覆盖 |
+|---|---|
+| 一次独立审查（冻结9file diff `7df9f980…446b5`） | 指定3files26/26及diff通过；提出三Important，未运行真实操作、未重复全suite |
+| 根修正后 Linux x64/Node24.19 | 定向4files30项；全46files546项、typecheck/build/脚本语法/Python ast/diff退出0；fixture仅合成pin/小size/inert converter、私有FS，static admission使用Linux平台/已验listener测试替身，不证明实际guest启动 |
+| 本提交标准CI | 发布后逐一读取own SHA四CI，最终链接/包摘要放Issue1回执；本段不预写未发生的平台结果 |
+
+审查Minor保留：监听期限fixture也违反socket前缀，覆盖为preDB拒绝而非每predicate隔离；bridge Typesimple首启socket竞争以观察后手动启动处理，未实现自动readiness。没有第二轮独立复审，修正后的结果是根自验。
+
+**首次桌面接入仍有实现阻塞：** 当前新helper仅inspect/connect、provisionRequest拒绝PREINSTALLED_TARGET_REQUIRED；Core.provision的assertAdmitted还依赖model.request、auth入口依赖login。N3 initialize-only没有独立业务入口，不能仅加provider.start或另起helper绕锁。经新增要求复核，补齐需要新的受信环境初始化业务入口/准入映射、同一helper0→1生命周期、fullbinding/fence/epoch与owned cleanup，已在runbook列为明确N3-0下一代码切片；本轮不掩盖缺口，不引入无使用者API或扩大model权限。
+
+真实ARM64准备环境/Mac目标、download/install/disk/chroot/entitlement/start/initialize分项批准均未确认；没有访问用户Mac、真实配置凭据、安装/挂载/boot/CLI/login/model/费用。只取小公开元数据（含8.5KB Sigstore bundle解析，密码学验签未执行）。same-boot恢复/硬RAM/IP-only/quotas及实际隔离/TaskA/B门禁保留。**N2交付准备配方和边界代码，尚非可直接运行的桌面首装；N3/N4没有自动推进，P1未完成。**

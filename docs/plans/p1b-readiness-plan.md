@@ -82,6 +82,10 @@ N1/N2 的无账号工作可按既有批准继续。当前优先获得单一路�
 - [ ] 有监督的首次安装可以作为首轮方案，不要求先建无人值守安装器；但需能在干净目标由相同步骤复现，不能只写“自行准备一台已配置机器”。
 - [ ] 汇总 device、bootstrap、runtime、verifier、Connection 的相容要求，输出一个简洁的联调准入清单。真实 secret/backend/gateway 缺项按选定路径区分，不安装所有供应商。
 
+### N2 本轮准备回执
+
+[受监督首装runbook](../validation/p1-bootstrap-runbook.md)给出固定cloud盘→ARM64 Linux离线配置→Mac交接的单一路径、目录/配置、失败与已有目标行为。磁盘发布不覆盖新出现的目标，guest初始监听/policy/authority及管理journal准入在DB前校验。包级锁/BOM、验签、安装/UEFI启动未实际执行；桌面仍缺同一helper首次create/start接线且prepare入口绑定model.request；runbook列明initialize-only独立业务入口/准入映射的N3-0下一代码切片，另启helper不能绕过单写锁。N2文档/合成验证不意味着N3可立即运行；具名准备环境/Mac分项授权与实际实现/证据缺口分别保留。
+
 ## 5. N3 — 在获准 Mac 上先完成无账号正向链
 
 **前置：** [Mac 目标准入](../validation/mac-target-preflight.md) 中的目标、所有者、操作范围和批准引用已落实。Mac mini M4 仍只是候选；此计划不代替授权。
