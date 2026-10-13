@@ -36,6 +36,12 @@
 
 候选 `970591703d95d43dab4be8a0e58a97da952a90f7` 的 [Electron CI](https://github.com/bill-liu/agent-nexus/actions/runs/38326975793) 中 Linux 356 项通过，Mac 逻辑测试 353 通过 / 3 失败；后续实际包和 canary 未运行。三个失败均为测试创建的临时根没有解析 macOS `/var` 的系统符号链接，被既有私有路径策略正确拒绝。最小修正仅对三个新建测试根应用 `realpathSync`，不改变生产路径策略或负例断言。Linux 用符号链接 TMPDIR 已先复现同样三个失败，修正后该文件 6/6 通过；typecheck 和 diff 检查通过，独立审查确认此范围。等待修正提交的 Mac 全套 CI，不以本地模拟替代。
 
+## A5：独立调用边界的先行 Mac 检查
+
+独立审查复现了旧 Node probe 的 Critical：候选拥有 stdout，可伪造观察而使错误函数通过。新代码关闭该路径，改由无宿主桥的 JavaScriptCore 执行函数；结果的数组、身份、错误原型和值由 C API/原生 JSON 观察，纯计算 OS sandbox 和描述符限制在执行候选前检查。新增标准 `macos-15` 工作流编译 helper，执行 15 个固定合成对照；没有 VM、CLI、账号或模型调用。作者修正后的原生部分尚未完成独立复审，根已逐行自审后先发布获取实际编译/运行证据，不能将它称为已通过 live 验收。
+
+旧 Node 路径必须在副作用前 BLOCKED。Linux 定向检查包括文本转换不执行候选和平台/授权缺失拒绝；Mac 编译与 canary 在本提交前 NOT_RUN。Darwin 的 `RLIMIT_AS` 不证明硬物理内存上限；本切片仅声称 CPU/时间/输出限制与语言/OS 的 IO 边界。项目测试改动检查属于结构证据，不证明测试覆盖率。Core SUCCEEDED 迁移及 A→B 验收装配留到后续集成提交。
+
 ## 尚未完成
 
 - A2、A3 其余 Node/Provider、A5 和 A6 正在独立工作树实现/集成；A4 的实际 Mac canary 待 CI。未宣称 P1-A 整体完成。

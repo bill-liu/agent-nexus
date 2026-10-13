@@ -1,0 +1,36 @@
+{
+  "stage": "B",
+  "entry": "src/export-records.mjs",
+  "function": "exportRecords(records, maxRecords = 1000)",
+  "requirements": [
+    "array records, integer maxRecords 1..10000",
+    "first N records in original order",
+    "return a new array without mutating input",
+    "empty arrays yield new empty arrays",
+    "omitted and undefined maximum default to 1000",
+    "non-array records throw TypeError",
+    "0, negative, >10000, noninteger, NaN, Infinity, string or null maximum throw RangeError",
+    "continue the exact accepted A output snapshot",
+    "add boundary project tests and append CHANGELOG"
+  ],
+  "assertions": [
+    "ordered-limit",
+    "short-input",
+    "fresh-empty",
+    "fresh-nonmutating",
+    "default-1000",
+    "valid-boundaries",
+    "invalid-records",
+    "invalid-limits",
+    "required-project-files",
+    "boundary-tests-added",
+    "changelog-appended"
+  ],
+  "requiredProjectFiles": [
+    "src/export-records.mjs",
+    "test/export-records.test.mjs",
+    "CHANGELOG.md"
+  ],
+  "revision": 2,
+  "deliverableChecks": "required nonempty source/tests/changelog; B tests bytes differ from bound accepted A, changelog starts with exact A content and adds nonempty text; behavioral coverage belongs to independent oracle"
+}

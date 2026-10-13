@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "verifierVersion": "p1-verifier-v2",
+  "oracleDigest": "daba74c796c604d45ff44a545d3edc5edefb60cc047ba1455b656843ec951eb3",
+  "contracts": {
+    "A": "080dcb8e01ed48db9aa4707d9db30e040b990585099572915a8427a56945e126",
+    "B": "21c5be678a91a6585e550865f4f78909ad724bb11be4c034919c461c7880e02a"
+  },
+  "controls": {
+    "task-a.mjs": "3ea5726a22a137da0821abbad6cd8a1db465bee404295bf76eb9241f2f8a0d41",
+    "task-a.test.mjs": "7b947d4d36733d422f8f206d209562f8e58b4538854efeaaba4a4232d7423adc",
+    "task-b.mjs": "64d88a86ee0bde50e8220002281e8592a507b69c1dee43738d66e0e4acb249f7",
+    "task-b.test.mjs": "c8485e71e5c81f00b4931249ea0c8232b164e76596d05957f5ec724bb97eab5e",
+    "wrong.mjs": "d7c59de2aea1a6503eba56befb85691070793c6e52a8703e055f522ad8ef93a4",
+    "forged-report.mjs": "f6c8b5f229b0af7de3419f925640bf62d5b9dfd54919ed3cf24fa52be0399dfe",
+    "forged-observation.mjs": "602324d5b9c923728c0836896a53f90afc01ec22006153d4e7fcc115e1622009",
+    "tampered-intrinsics.mjs": "928678f4340a7998d4854644ff703a9d7df90d369f29dc1acc85726b2b653b22"
+  },
+  "protectedOracleDigest": "494af7dbf38c84a6d75330c6407fefbe01dabdcc1a5e16f266d577fdf1905de0",
+  "retiredProbeDigest": "2e4c8085f5d8412d94db8570060b83c2e61ab77739564d1c5f8b6dbdb07744fc"
+}

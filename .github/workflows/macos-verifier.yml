@@ -1,0 +1,26 @@
+name: macOS protected verifier canary
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-verifier-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-verifier:
+    name: Native compilation and curated pure-JS controls (no VM or account)
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm install --global npm@11.9.0
+      - run: npm ci
+      - name: Compile trusted helper and run 15 fixed synthetic controls
+        run: node native/macos-verifier/canary.mjs

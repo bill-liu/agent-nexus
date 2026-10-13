@@ -1,0 +1,9 @@
+{
+  "version": "p1-protected-oracle-v2",
+  "entry": "src/export-records.mjs",
+  "assertionsA": ["ordered-limit", "short-input", "fresh-empty", "fresh-nonmutating", "default-1000", "valid-boundaries"],
+  "assertionsB": ["invalid-records", "invalid-limits"],
+  "invalidRecords": [null, {}, "abc", 1, true],
+  "invalidLimits": [0, -1, 10001, 1.2, "2", null],
+  "specialInvalidLimits": ["NaN", "Infinity"]
+}
