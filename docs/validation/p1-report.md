@@ -46,6 +46,8 @@ A4 修正候选 [`ee2776c`](https://github.com/bill-liu/agent-nexus/commit/ee277
 
 A5 先行候选 [`7753f64`](https://github.com/bill-liu/agent-nexus/commit/7753f649d47bcf62df7ba6010eae55c209c83001) 的 [原生 canary](https://github.com/bill-liu/agent-nexus/actions/runs/38330066346) 编译通过但首个运行检查失败 `BLOCKED_RESOURCE_LIMITS`，15 个对照尚未通过。本次仅细化资源检查错误码以定位实际不支持的限制，不降低边界。相同 SHA 的 Mac 包、helper 和 smoke 均 SUCCESS，但不能替代原生检查。
 
+诊断候选 `03be7ee` 的 [Mac canary](https://github.com/bill-liu/agent-nexus/actions/runs/38330482542) 明确定位为 `BLOCKED_RESOURCE_AS`。Darwin 该 API 不提供本实现需要的硬地址空间约束，因此删除这个不可用且不能证明硬内存限制的调用；保留 OS sandbox、文件/进程/描述符、CPU、父进程时间/输出检查。硬内存上限列为未支持，不增加此 capability，不把该失败伪装为资源门禁已通过。真实验证准入必须考虑此限制；后续标准 CI 仅执行固定合成对照。
+
 ## 尚未完成
 
 - A2、A3 其余 Node/Provider、A5 和 A6 正在独立工作树实现/集成；A4 的实际 Mac canary 待 CI。未宣称 P1-A 整体完成。

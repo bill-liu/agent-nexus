@@ -82,12 +82,14 @@ int main(void) { @autoreleasepool {
  // PureComputation alone permits socket creation on some versions; make new
  // descriptors/processes impossible too. Only existing stdout/stderr survive.
  for(int fd=3;fd<1024;fd++)close(fd);
- struct rlimit zero={0,0},cpu={2,2},memory={2147483648ULL,2147483648ULL};
+ // Darwin rejects RLIMIT_AS here (and aliases it to RSS); it cannot establish
+ // a hard address-space/physical-memory bound. Do not claim such a capability.
+ // CPU + supervisor elapsed/output limits remain enforced and tested.
+ struct rlimit zero={0,0},cpu={2,2};
  if(setrlimit(RLIMIT_NOFILE,&zero))return blocked("BLOCKED_RESOURCE_NOFILE");
  if(setrlimit(RLIMIT_NPROC,&zero))return blocked("BLOCKED_RESOURCE_NPROC");
  if(setrlimit(RLIMIT_FSIZE,&zero))return blocked("BLOCKED_RESOURCE_FSIZE");
  if(setrlimit(RLIMIT_CPU,&cpu))return blocked("BLOCKED_RESOURCE_CPU");
- if(setrlimit(RLIMIT_AS,&memory))return blocked("BLOCKED_RESOURCE_AS");
  // Fail closed unless actual denial is observed before any candidate evaluation.
  int fd=open("/etc/passwd",O_RDONLY);if(fd>=0){close(fd);return blocked("BLOCKED_FILESYSTEM_PROOF");}
  fd=socket(AF_INET,SOCK_STREAM,0);if(fd>=0){close(fd);return blocked("BLOCKED_NETWORK_PROOF");}
