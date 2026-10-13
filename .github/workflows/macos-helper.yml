@@ -1,0 +1,23 @@
+name: macOS VM helper compile and policy checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-helper-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  helper:
+    name: Swift helper build and accountless policy checks (no VM)
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - run: swift --version
+      - run: swift build --package-path native/macos-sandbox-host
+      - run: swift test --package-path native/macos-sandbox-host
+      - name: Read-only capability observation; never starts a VM
+        run: swift run --skip-build --package-path native/macos-sandbox-host an-sandbox-host --preflight

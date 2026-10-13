@@ -12,9 +12,17 @@
 | P0 回归 + A1 / P1-A / synthetic | Node 24.19.0 / Linux x64 | 根工作区 `npm run typecheck`、`npm test`（21 文件 / 308 项）、`npm run build`、`git diff --check` 均退出 0，时间 2026-10-13 00:00 UTC。构建为未提交工作区验证，不冒充已发布包。 |
 | A1 独立差异审查 / P1-A / code-review | 本提交代码 | 未发现 A1 独立 Critical/Important 阻塞。发现 A3 Node 观察尚未提供所需退出状态，须在 A3 集成时修复并验证实际适配器形状。 |
 
-候选识别：上述结果对应本提交中的 A1 源码与测试；提交 SHA 由 Git 历史给出。远端同 SHA 的 macOS CI、包摘要及产物在完成后另行记录，不以 Linux 构建替代。
+候选识别：A1 提交为 [`fcd3cd9dd6f5416bb3eb925462b5725080e385bc`](https://github.com/bill-liu/agent-nexus/commit/fcd3cd9dd6f5416bb3eb925462b5725080e385bc)。同 SHA 的 [工具链 smoke](https://github.com/bill-liu/agent-nexus/actions/runs/38325207244) 与 [逻辑/实际 Electron 包 CI](https://github.com/bill-liu/agent-nexus/actions/runs/38325207136) 均已 SUCCESS。macOS 15 arm64、Electron 44.7.0：308 逻辑、11 Electron 安全、6 Mac 自动化通过，构建 `dirty: false`。这些仍是 P0 桌面与 P1-A 协议回归，不是 VM/CLI live 证明。
+
+该候选 `app.asar` SHA256：`104b224c9287578a9fe02e1e6410d29c2595ac6c6b94df2663cfdcda268e92d3`。证据产物 ID `11780372569`，归档 SHA256 `931d8f966963e8d0512fff9ecbb344ecb4b0242fbdb23e00208bc162f1ea2ef1`，到期时间 2026-10-20；工作流产物保留包摘要和自动化报告，不是签名发行包。
 
 ## 尚未完成
+
+### A3 helper 的先行编译切片
+
+新增 Swift Virtualization helper 源码、7 项策略单测和标准 `macos-15` 编译工作流。此切片经过独立代码审查后提交用于取得编译证据；Linux 环境没有 Swift/macOS SDK，尚不能据此宣称编译或 VM 运行通过。工作流只 build/test 和只读 `--preflight`，不分配 VM 磁盘、不下载 ISO、不启动 VM、不签名、不登录。
+
+受保护配置控制生命周期与可选 NAT；默认没有网卡。授权过期后仍可查看和停止已拥有的实例；私有 Unix/vsock 桥在所有复制线程退出后才关闭描述符。真实主机重启后可核对 kernel boot UUID，恢复旧实例的停止状态。**同一次主机启动内 helper 崩溃后的实例仍保持 UNKNOWN**；尚无无须主机重启的完整恢复证明。此限制和桥并发/真实 VM 检查仍属于未关闭的 A3/B1/B3 项，不把编译通过算生命周期通过。
 
 - A2–A6 正在各独立工作树实现/集成，未在此切片宣称完成。
 - A1 恢复后的真实 Run 保持 LOST，直到受信停写观察；没有新增基于不可信 alive 回执的恢复放行。
