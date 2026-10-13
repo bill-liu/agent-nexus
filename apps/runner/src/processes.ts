@@ -35,13 +35,18 @@ export class DurableDriverBundles implements PreparedDriverBundlePort {
 }
 /** Native terminal journal is independent of spool capacity. Publication and its receipt commit atomically. */
 class DurableTerminalPublisher {
- private readonly inFlight=new Set<string>();private closed=false;private readonly unsubscribe:()=>void;
+ private readonly inFlight=new Set<string>();private closed=false;private handoffAfter=0;private readonly unsubscribe:()=>void;
  constructor(private readonly db:DatabaseSync,private readonly runner:DurableRunner,private readonly hook?:GuestRunnerOptions['onTerminal']){db.exec('CREATE TABLE IF NOT EXISTS codex_driver_terminal(run_id TEXT PRIMARY KEY,observation TEXT NOT NULL);CREATE TABLE IF NOT EXISTS runner_terminal_publications(run_id TEXT PRIMARY KEY,cursor INTEGER NOT NULL,handoff_done INTEGER NOT NULL DEFAULT 0)');this.unsubscribe=runner.spool.onCapacityAvailable(()=>this.retry());this.retry();}
- retry():void{if(this.closed)return;const rows=this.db.prepare('SELECT t.run_id,t.observation,p.cursor,p.handoff_done FROM codex_driver_terminal t LEFT JOIN runner_terminal_publications p ON p.run_id=t.run_id WHERE p.run_id IS NULL OR p.handoff_done=0 LIMIT 64').all() as {run_id:string;observation:string;cursor:number|null;handoff_done:number|null}[];
-  for(const row of rows){const observation=JSON.parse(row.observation) as DriverTerminalObservation;if(row.cursor===null){this.db.exec('BEGIN IMMEDIATE');try{const cursor=this.runner.spool.append({runId:observation.binding.runId,kind:'terminal',payload:{...observation.binding,nativeThreadId:observation.nativeThreadId,nativeTurnId:observation.nativeTurnId,status:observation.status,stopped:'UNKNOWN'}});this.db.prepare('INSERT INTO runner_terminal_publications VALUES(?,?,0)').run(row.run_id,cursor);this.db.exec('COMMIT');}catch{this.db.exec('ROLLBACK');break;}}
-   if(this.hook&&!this.inFlight.has(row.run_id)){this.inFlight.add(row.run_id);void Promise.resolve().then(()=>{if(this.closed)return;return this.hook!(structuredClone(observation));}).then(()=>{if(!this.closed)this.db.prepare('UPDATE runner_terminal_publications SET handoff_done=1 WHERE run_id=?').run(row.run_id);}).catch(()=>{/* Retain pending handoff; native completion is not stop evidence. */}).finally(()=>{this.inFlight.delete(row.run_id);});}
-  }
+ retry():void{if(this.closed)return;
+  // Publish new journals independently; retryable old handoffs cannot consume this window.
+  const unpublished=this.db.prepare('SELECT t.run_id,t.observation FROM codex_driver_terminal t LEFT JOIN runner_terminal_publications p ON p.run_id=t.run_id WHERE p.run_id IS NULL ORDER BY t.rowid LIMIT 64').all() as {run_id:string;observation:string}[];
+  for(const row of unpublished){const observation=JSON.parse(row.observation) as DriverTerminalObservation;this.db.exec('BEGIN IMMEDIATE');try{const cursor=this.runner.spool.append({runId:observation.binding.runId,kind:'terminal',payload:{...observation.binding,nativeThreadId:observation.nativeThreadId,nativeTurnId:observation.nativeTurnId,status:observation.status,stopped:'UNKNOWN'}});this.db.prepare('INSERT INTO runner_terminal_publications VALUES(?,?,0)').run(row.run_id,cursor);this.db.exec('COMMIT');}catch{this.db.exec('ROLLBACK');break;}this.handoff(row.run_id,observation);}
+  if(!this.hook)return;
+  const pending=()=>this.db.prepare('SELECT t.rowid AS position,t.run_id,t.observation FROM codex_driver_terminal t JOIN runner_terminal_publications p ON p.run_id=t.run_id WHERE p.handoff_done=0 AND t.rowid>? ORDER BY t.rowid LIMIT 64').all(this.handoffAfter) as {position:number;run_id:string;observation:string}[];
+  let rows=pending();if(!rows.length){this.handoffAfter=0;rows=pending();}
+  for(const row of rows){this.handoffAfter=row.position;this.handoff(row.run_id,JSON.parse(row.observation) as DriverTerminalObservation);}
  }
+ private handoff(runId:string,observation:DriverTerminalObservation):void{if(!this.hook||this.inFlight.has(runId))return;this.inFlight.add(runId);void Promise.resolve().then(()=>{if(this.closed)return;return this.hook!(structuredClone(observation));}).then(()=>{if(!this.closed)this.db.prepare('UPDATE runner_terminal_publications SET handoff_done=1 WHERE run_id=?').run(runId);}).catch(()=>{/* Retain pending handoff; native completion is not stop evidence. */}).finally(()=>{this.inFlight.delete(runId);});}
  stop():void{this.closed=true;this.unsubscribe();}
 }
 

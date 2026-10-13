@@ -55,7 +55,7 @@ export class CodexAppServerDriver implements RuntimeDriver {
   if(this.starting&&!this.mapping){if(this.deferred.length>=64)throw Error('FRAME_BACKPRESSURE');this.deferred.push(frame);return;}
   this.enqueueServerFrame(frame);
  }
- private enqueueServerFrame(frame:Record<string,any>):void{if(++this.queuedFrames>64)throw Error('FRAME_BACKPRESSURE');this.serverChain=this.serverChain.then(async()=>{if(!this.closed)await this.serverFrame(frame);}).catch(()=>{this.event('protocol.blocked');this.close();}).finally(()=>{this.queuedFrames--;});}
+ private enqueueServerFrame(frame:Record<string,any>):void{if(frame.method==='turn/completed'&&!Object.hasOwn(frame,'id')){this.terminalFrame(frame);return;}if(++this.queuedFrames>64)throw Error('FRAME_BACKPRESSURE');this.serverChain=this.serverChain.then(async()=>{if(!this.closed)await this.serverFrame(frame);}).catch(()=>{this.event('protocol.blocked');this.close();}).finally(()=>{this.queuedFrames--;});}
  private async serverFrame(frame:Record<string,any>):Promise<void>{
   if(Object.hasOwn(frame,'id')){
    if(!id(frame.id))throw Error('INVALID_FRAME');
@@ -76,14 +76,15 @@ export class CodexAppServerDriver implements RuntimeDriver {
    const m=this.active();const approvalId=`codex:${canonicalDigest({runId:this.scope.runId,sessionId:this.scope.sessionId,nativeRequestId:frame.params.requestId})}`;
    this.db.prepare("UPDATE codex_native_requests SET lifecycle='RESOLVED',pending_proof=0 WHERE approval_id=?").run(approvalId);await this.core.resolved({binding:m.approvalBinding,nativeThreadId:m.nativeThreadId,nativeTurnId:m.nativeTurnId,notification:frame});this.event('approval.resolved',approvalId);return;
   }
-  if(frame.method==='turn/completed'){
+  // Untrusted raw payloads may contain credentials. Ordinary events retain no arbitrary fields.
+  this.event('native.notification');
+ }
+ /** Persist terminal input synchronously: EOF or slow Core RPC must not discard it. */
+ private terminalFrame(frame:Record<string,any>):void{
    const m=this.mapping;if(!m||frame.params?.threadId!==m.nativeThreadId||frame.params?.turn?.id!==m.nativeTurnId)throw Error('STALE_NATIVE_SCOPE');shape(frame.params,['threadId','turn']);const turn=frame.params.turn;shape(turn,['id','items','status'],['completedAt','durationMs','error','itemsView','startedAt']);if(!Array.isArray(turn.items)||!['completed','interrupted','failed'].includes(turn.status))throw Error('INVALID_NATIVE_TERMINAL');
    const observation:DriverTerminalObservation={binding:structuredClone(this.scope),nativeThreadId:m.nativeThreadId,nativeTurnId:m.nativeTurnId,status:turn.status};const old=this.db.prepare('SELECT observation FROM codex_driver_terminal WHERE run_id=?').get(this.scope.runId) as {observation:string}|undefined;if(old){if(canonicalDigest(JSON.parse(old.observation))!==canonicalDigest(observation))throw Error('NATIVE_TERMINAL_CONFLICT');return;}
    const previous=m.state;this.db.exec('BEGIN IMMEDIATE');try{this.invalidateLocal();this.db.prepare('INSERT INTO codex_driver_terminal VALUES(?,?)').run(this.scope.runId,JSON.stringify(observation));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');m.state=previous;throw error;}
    try{const result:unknown=this.options.onTerminal?.(structuredClone(observation));if(result!==undefined){if(result instanceof Promise)void result.catch(()=>{});throw Error('INVALID_TERMINAL_OBSERVER');}}catch{this.event('terminal.publication-deferred');}void this.core.interruptTurn(m.approvalBinding).catch(()=>this.event('approval.authority-unreachable'));this.event('turn.completed');return;
-  }
-  // Untrusted raw payloads may contain credentials. Ordinary events retain no arbitrary fields.
-  this.event('native.notification');
  }
  private event(type:string,approvalId?:string):void{if(this.eventLog.length===256)this.eventLog.shift();this.eventLog.push({type,...(approvalId?{approvalId}:{})});}
  events():ReadonlyArray<{type:string;approvalId?:string}>{return structuredClone(this.eventLog);}
