@@ -119,7 +119,7 @@ int main(void) { @autoreleasepool {
  NSData *beforeBytes=[NSJSONSerialization dataWithJSONObject:call[@"records"]?:[NSNull null] options:NSJSONWritingFragmentsAllowed error:NULL];
  NSData *afterBytes=[NSJSONSerialization dataWithJSONObject:after options:NSJSONWritingFragmentsAllowed error:NULL];
  BOOL unchanged=JSValueIsArray(ctx,records)&&beforeBytes&&[beforeBytes isEqualToData:afterBytes];
- NSDictionary *observation=@{@"value":output,@"isArray":@(result&&JSValueIsArray(ctx,result)),@"sameArray":@(result&&JSValueIsStrictEqual(ctx,result,records)),@"inputUnchanged":@(unchanged),@"errorName":errorName?:[NSNull null],@"sandbox":@"pure-computation-no-fds-v1"};
+ NSDictionary *observation=@{@"value":output,@"isArray":[NSNumber numberWithBool:result&&JSValueIsArray(ctx,result)],@"sameArray":[NSNumber numberWithBool:result&&JSValueIsStrictEqual(ctx,result,records)],@"inputUnchanged":[NSNumber numberWithBool:unchanged],@"errorName":errorName?:[NSNull null],@"sandbox":@"pure-computation-no-fds-v1"};
  NSData *json=[NSJSONSerialization dataWithJSONObject:observation options:NSJSONWritingSortedKeys error:NULL];
  if(!json||[json length]>65536)return blocked("BLOCKED_OUTPUT_LIMIT");
  const char *out=[json bytes];size_t left=[json length];while(left){ssize_t n=write(STDOUT_FILENO,out,left);if(n<=0)return 71;out+=n;left-=(size_t)n;}
