@@ -108,3 +108,20 @@ Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/ag
 实际开发包：macOS **15.7.9 / arm64**，Electron **44.7.0**，phase **P1-A**，`dirty:false`。app.asar SHA256：`18e8981780c03361e49bea277bf4473596a5adc5fea5a11ac4c4ef40834e8daa`。验证产物 ID **11788264984**，归档 SHA256 **9effb0bc9c966cb7c70a5672716e65b250295afb617e2e4cc5f9e45ec516862a**，有效至 **2026-10-20 04:21:27 UTC**；[工作流产物页](https://github.com/bill-liu/agent-nexus/actions/runs/38345952620#artifacts)。它是测试报告/包摘要，不是签名发行 App。
 
 根 Linux 最终也为 43 文件/525 项、typecheck/build/diff 退出 0。A1–A6 实现和无账号验证材料已提交，P0 历史证据保留。前述未完成独立复审、未支持实现路径以及全部 P1-B/live/人工项仍保持相应状态，不能因 CI 绿而改为 PASS；**P1 整体未完成**。本次仅追加验证记录；后续记录提交仍需检查自己的 CI，其包摘要以该 run 的 package-evidence 为准，不冒用本段代码候选的摘要。
+
+## N1：A2 / A3 独立复审收尾
+
+保留最新 README/readiness 文档提交 `f66d756` 后，A2 补丁 [`e4d11e80a0e0b11dae98d1e7962c3a83ec513a72`](https://github.com/bill-liu/agent-nexus/commit/e4d11e80a0e0b11dae98d1e7962c3a83ec513a72) 已非强推进入 main。原满 spool、此次 EOF 丢已接收 terminal 和旧失败 handoff 饥饿三项独立 CLOSED。该 SHA 四组 CI SUCCESS：
+
+| 检查 | 同 SHA 结果 |
+|---|---|
+| [桌面 38348513471](https://github.com/bill-liu/agent-nexus/actions/runs/38348513471) | Linux/Mac 各 43 文件/527 项、实际包 Electron 11/11、Mac 9/9；macOS 15.7.9 arm64、Electron 44.7.0、dirty:false |
+| [原生 38348513499](https://github.com/bill-liu/agent-nexus/actions/runs/38348513499) | 15/15 固定合成对照 |
+| [helper 38348513431](https://github.com/bill-liu/agent-nexus/actions/runs/38348513431) | Swift 6.1.2 build、7/7、只读 preflight；virtualizationSupported:false、vmStarted:false |
+| [smoke 38348513494](https://github.com/bill-liu/agent-nexus/actions/runs/38348513494) | 临时 macOS SDK 工具链检查通过 |
+
+该包 app.asar SHA256 `d6de82cdca49bd5d16a8851efb2228054eb32318d2e1b73f10285c6b997b0162`；产物 ID `11789363352`，归档 SHA256 `454fcb5e155db11b122b2dd87b6aea5c3f23f95df38eb0b24c8e85a22f3fc675`，到期 `2026-10-20T04:53:04Z`。不作为签名发行包或 live 证明。
+
+随后独立 A3 审查完整现有 30 文件及必要接线，原 helper #2/#3 保持源码关闭；#1 same-boot UNKNOWN 仍是明示 B3 阻塞。实证发现磁盘准备的过期/畸形授权仍可产生后续副作用，并在首补丁发现 timeout:0 残留。均建立 RED→GREEN 后最小修复；最终补丁由同一独立审查者复验关闭（9 回归、12 额外边界）。本提交根 Linux 44 文件/536 项、typecheck/build/语法/diff 通过；该提交自己的 Mac CI 另行核对，不冒用 e4d 包摘要。
+
+详细范围、失败历史和来源分别见 [关键复审记录](p1-critical-review.md)。A5 独立复审下一步串行进行；N2 首装、P1-B/live、人工 Mac 和已声明未实现能力维持原状态，**P1 未完成**。
