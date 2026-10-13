@@ -13,7 +13,7 @@ export class CoreClient {
   const env=workerEnvironment(process.env);
   const compiler=join(dirname(dirname(buildDirectory)),`app.asar.unpacked/node_modules/@esbuild/darwin-${process.arch}/bin/esbuild`);
   if(process.platform==='darwin'&&existsSync(compiler))env.ESBUILD_BINARY_PATH=compiler;
-  this.child=utilityProcess.fork(join(buildDirectory,'core-worker.cjs'),[join(dataDirectory,mode==='p1-preparation'?'p1.sqlite':'core.sqlite'),mode,admissionFile],{env,serviceName:'AN Core',stdio:'ignore'});
+  this.child=utilityProcess.fork(join(buildDirectory,'core-worker.cjs'),[join(dataDirectory,mode==='p1-preparation'?'p1.sqlite':'core.sqlite'),mode,admissionFile],{cwd:dataDirectory,env,serviceName:'AN Core',stdio:'ignore'});
   const startup=setTimeout(()=>readyReject(Error('CORE_STARTUP_TIMEOUT')),15_000);
   this.child.on('message',(reply:WorkerReply|{type:string})=>{if('type' in reply){if(reply.type==='changed')onChange();return;}if(reply.id==='ready'){clearTimeout(startup);if(!reply.ok){readyReject(Error(reply.error??'CORE_STARTUP_FAILED'));return;}this.available=true;this.sqliteVersion=reply.sqliteVersion??'';readyResolve();return;}const waiting=this.pending.get(reply.id);if(!waiting)return;clearTimeout(waiting.timer);this.pending.delete(reply.id);if(reply.ok)waiting.resolve(reply.result);else waiting.reject(Error(reply.error??'CORE_REJECTED'));});
   this.child.on('exit',()=>{clearTimeout(startup);this.available=false;readyReject(Error('CORE_UNAVAILABLE'));for(const item of this.pending.values()){clearTimeout(item.timer);item.reject(Error('CORE_UNAVAILABLE'));}this.pending.clear();exitResolve();onExit();});

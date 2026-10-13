@@ -53,9 +53,12 @@ test('packaged verifier compiler transforms text using its unpacked fixed tool w
   const {createRequire}=process.getBuiltinModule('node:module')!;const {join,dirname}=process.getBuiltinModule('node:path')!;
   const require=createRequire(join(app.getAppPath(),'package.json'));
   process.env.ESBUILD_BINARY_PATH=join(dirname(app.getAppPath()),`app.asar.unpacked/node_modules/@esbuild/darwin-${process.arch}/bin/esbuild`);
-  const {compileCandidate}=require(join(app.getAppPath(),'build/verifier-compiler.cjs'));
-  const code=compileCandidate("throw new Error('MUST_NOT_EXECUTE');export function exportRecords(a){return a.slice()}");
-  return {transformed:code.includes('module.exports.exportRecords'),containsUnevaluatedThrow:code.includes('MUST_NOT_EXECUTE')};
+  // The production utilityProcess has explicit physical cwd=userData. Electron
+  // Main's ASAR cwd is not a real directory suitable for spawning the compiler.
+  const previous=process.cwd();process.chdir(app.getPath('userData'));
+  try{const {compileCandidate}=require(join(app.getAppPath(),'build/verifier-compiler.cjs'));const code=compileCandidate("throw new Error('MUST_NOT_EXECUTE');export function exportRecords(a){return a.slice()}");
+  return {transformed:code.includes('module.exports.exportRecords'),containsUnevaluatedThrow:code.includes('MUST_NOT_EXECUTE')};}
+  finally{process.chdir(previous);}
  });expect(result).toEqual({transformed:true,containsUnevaluatedThrow:true});}
  finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();}
 });
