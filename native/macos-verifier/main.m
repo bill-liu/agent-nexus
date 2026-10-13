@@ -68,6 +68,17 @@ int main(void) { @autoreleasepool {
  NSDictionary *call=request[@"call"];
  JSGlobalContextRef ctx=JSGlobalContextCreate(NULL);if(!ctx)return blocked("BLOCKED_JS_CONTEXT");
  JSValueRef error=NULL;
+ // Some JavaScriptCore builds install a native console object even in a plain
+ // C-API context. Remove and seal every host-facing name before candidate code.
+ JSObjectRef global=JSContextGetGlobalObject(ctx);
+ const char *hostNames[]={"console","print","process","require","fetch","readFile","ObjC","$"};
+ for(unsigned i=0;i<sizeof(hostNames)/sizeof(hostNames[0]);i++){
+  JSStringRef key=JSStringCreateWithUTF8CString(hostNames[i]);
+  if(!JSObjectDeleteProperty(ctx,global,key,&error)||error)return blocked("BLOCKED_HOST_GLOBAL_REMOVAL");
+  JSObjectSetProperty(ctx,global,key,JSValueMakeUndefined(ctx),kJSPropertyAttributeReadOnly|kJSPropertyAttributeDontDelete,&error);
+  JSValueRef value=JSObjectGetProperty(ctx,global,key,&error);JSStringRelease(key);
+  if(error||!JSValueIsUndefined(ctx,value))return blocked("BLOCKED_HOST_GLOBAL_REMOVAL");
+ }
  JSValueRef typePrototype=evaluate(ctx,@"TypeError.prototype",&error);JSValueProtect(ctx,typePrototype);
  JSValueRef freeze=evaluate(ctx,@"Object.freeze",&error);JSValueProtect(ctx,freeze);
  JSValueRef rangePrototype=evaluate(ctx,@"RangeError.prototype",&error);JSValueProtect(ctx,rangePrototype);

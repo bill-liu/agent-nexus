@@ -1,3 +1,5 @@
+import { createReadStream } from 'node:fs';
+import { lstat } from 'node:fs/promises';
 import { createHash, createPublicKey, verify, type KeyObject } from 'node:crypto';
 import { canonicalManifest, parseSignedManifest, type ArtifactManifest, type TargetNode } from './manifest';
 export type TrustedKeys = ReadonlyMap<string, KeyObject | string>;
@@ -17,4 +19,13 @@ export function verifyManifest(envelope: unknown, trustedKeys: TrustedKeys, targ
 }
 export function verifyArtifact(bytes: Uint8Array, manifest: ArtifactManifest): void {
   if (bytes.length !== manifest.size || hashBytes(bytes) !== manifest.digest) throw new Error('CATALOG_DIGEST_INVALID');
+}
+
+/** Streaming verification for raw VM artifacts; never buffer an entire image in Core memory. */
+export async function verifyArtifactFile(path: string, manifest: ArtifactManifest): Promise<void> {
+  const stat = await lstat(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size !== manifest.size) throw new Error('CATALOG_DIGEST_INVALID');
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  if (hash.digest('hex') !== manifest.digest) throw new Error('CATALOG_DIGEST_INVALID');
 }

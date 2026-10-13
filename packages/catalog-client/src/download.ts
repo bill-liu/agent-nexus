@@ -1,16 +1,17 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync, lstatSync, appendFileSync, truncateSync, renameSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync, lstatSync, appendFileSync, truncateSync, renameSync, rmSync, copyFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { canonicalManifest, type SignedManifest, type ArtifactManifest, type TargetNode } from './manifest';
-import { verifyManifest, verifyArtifact, hashBytes, type TrustedKeys } from './verify';
+import { verifyManifest, verifyArtifact, verifyArtifactFile, hashBytes, type TrustedKeys } from './verify';
 import { extractArchive, verifyExtractedArchive, assertSafeParents, DEFAULT_ARCHIVE_LIMITS, type ArchiveLimits } from './extract';
 export interface DownloadAuthorization { url: string; expiresAt: number }
 export interface CatalogSource {
   authorize(manifest: ArtifactManifest, target: TargetNode): Promise<DownloadAuthorization>;
   read(authorization: DownloadAuthorization, offset: number, signal: AbortSignal): Promise<{ bytes: Uint8Array; done: boolean }>;
 }
-export interface DownloadOptions { db: DatabaseSync; directory: string; trustedKeys: TrustedKeys; target: TargetNode; source: CatalogSource; limits?: ArchiveLimits; permissionGrant?: string[] }
+export interface BootstrapSourcePin { source: string; digest: string; size: number; licenseRef: string }
+export interface DownloadOptions { bootstrapSources?: readonly BootstrapSourcePin[]; db: DatabaseSync; directory: string; trustedKeys: TrustedKeys; target: TargetNode; source: CatalogSource; limits?: ArchiveLimits; permissionGrant?: string[] }
 export interface DownloadRequest { commandId: string; idempotencyKey: string; botId: string; envelope: SignedManifest }
 export type DownloadState = 'pending' | 'downloading' | 'interrupted' | 'waiting-source' | 'verifying' | 'installing' | 'ready' | 'cancelled' | 'failed';
 export interface DownloadStatus { operationId: string; commandId: string; botId: string; resourceId: string; version: string; state: DownloadState; downloadedBytes: number; totalBytes: number; errorCode?: string }
@@ -55,7 +56,7 @@ export class DownloadManager {
   /** A signature-verified revocation is a monotonic local tombstone; older signed manifests cannot undo it. */
   observe(envelope: SignedManifest): { withdrawn: boolean; affectedBotIds: string[] } {
     const manifest = verifyManifest(envelope, this.options.trustedKeys, this.options.target, { allowWithdrawn: true });
-    if (!manifest.source.startsWith('fixture://')) throw new Error('PUBLIC_PUBLISHER_PREFLIGHT_REQUIRED');
+    this.checkSource(manifest);
     if (manifest.withdrawn) this.options.db.prepare('INSERT OR IGNORE INTO catalog_revocation VALUES(?,?,?,?)').run(manifest.resourceId, manifest.version, this.targetKey, JSON.stringify(envelope));
     const withdrawn = this.isWithdrawn(manifest);
     const affectedBotIds = withdrawn ? this.options.db.prepare('SELECT DISTINCT bot_id,envelope FROM catalog_operation WHERE target_key=?').all(this.targetKey).filter(row => {
@@ -64,14 +65,22 @@ export class DownloadManager {
     }).map(row => String(row.bot_id)) : [];
     return { withdrawn, affectedBotIds: [...new Set(affectedBotIds)].sort() };
   }
+  private checkSource(manifest: ArtifactManifest): void {
+    if (manifest.format === 'an-fixture-v1' && manifest.source.startsWith('fixture://')) return;
+    // Pins are trusted installation policy, never supplied by the manifest or renderer.
+    const pin = this.options.bootstrapSources?.find(pin => pin.source === manifest.source && pin.digest === manifest.digest && pin.size === manifest.size);
+    if (manifest.format !== 'raw-bootstrap-v1' || !pin?.licenseRef || !manifest.source.startsWith('https://')) throw new Error('PUBLIC_PUBLISHER_PREFLIGHT_REQUIRED');
+    const source = new URL(manifest.source);
+    if (source.username || source.password || source.hash) throw new Error('CATALOG_AUTHORIZATION_INVALID');
+  }
   private isWithdrawn(manifest: ArtifactManifest): boolean {
     return Boolean(this.options.db.prepare('SELECT 1 FROM catalog_revocation WHERE resource_id=? AND version=? AND target_key=?').get(manifest.resourceId, manifest.version, this.targetKey));
   }
   private checkedManifest(envelope: unknown): ArtifactManifest {
     const manifest = verifyManifest(envelope, this.options.trustedKeys, this.options.target);
     if (this.isWithdrawn(manifest)) throw new Error('CATALOG_WITHDRAWN');
-    if (!manifest.source.startsWith('fixture://')) throw new Error('PUBLIC_PUBLISHER_PREFLIGHT_REQUIRED');
-    const maxBytes = this.options.limits?.maxArchiveBytes ?? DEFAULT_ARCHIVE_LIMITS.maxArchiveBytes;
+    this.checkSource(manifest);
+    const maxBytes = manifest.format === 'raw-bootstrap-v1' ? Math.min(16 * 1024 ** 3, this.options.bootstrapSources?.find(pin => pin.digest === manifest.digest)?.size ?? 0) : this.options.limits?.maxArchiveBytes ?? DEFAULT_ARCHIVE_LIMITS.maxArchiveBytes;
     if (manifest.size > maxBytes) throw new Error('CATALOG_ARCHIVE_LIMIT');
     if (manifest.permissions.some(permission => !this.options.permissionGrant?.includes(permission))) throw new Error('CATALOG_PERMISSION_DENIED');
     return manifest;
@@ -132,7 +141,7 @@ export class DownloadManager {
           if (++refreshes > 4) throw new Error('URL_EXPIRED');
           authorization = await this.options.source.authorize(manifest, this.options.target);
           this.checkGeneration(id, generation);
-          if (!authorization || !authorization.url.startsWith('fixture://') || !Number.isFinite(authorization.expiresAt)) throw new Error('CATALOG_AUTHORIZATION_INVALID');
+          if (!authorization || !(manifest.format === 'an-fixture-v1' ? authorization.url.startsWith('fixture://') : authorization.url === manifest.source) || !Number.isFinite(authorization.expiresAt)) throw new Error('CATALOG_AUTHORIZATION_INVALID');
           if (authorization.expiresAt <= Date.now()) { authorization = undefined; continue; }
         }
         let chunk: { bytes: Uint8Array; done: boolean };
@@ -147,18 +156,31 @@ export class DownloadManager {
       }
       this.state(id, generation, 'verifying');
       if (this.isWithdrawn(manifest)) throw new Error('CATALOG_WITHDRAWN');
-      const bytes = readFileSync(partial); verifyArtifact(bytes, manifest);
+      const bytes = manifest.format === 'raw-bootstrap-v1' ? undefined : readFileSync(partial);
+      if (bytes) verifyArtifact(bytes, manifest); else await verifyArtifactFile(partial, manifest);
+      this.checkGeneration(id, generation);
       this.state(id, generation, 'installing');
       assertSafeParents(join(this.directory, 'staging'));
       staging = join(this.directory, 'staging', `${id}-${generation}-${randomUUID()}`);
-      extractArchive(bytes, staging, this.options.limits);
+      if (manifest.format === 'raw-bootstrap-v1') {
+        mkdirSync(staging, { mode: 0o700 });
+        copyFileSync(partial, join(staging, 'artifact.bin'));
+        await verifyArtifactFile(join(staging, 'artifact.bin'), manifest);
+        this.checkGeneration(id, generation);
+      } else extractArchive(bytes!, staging, this.options.limits);
       writeFileSync(join(staging, '.an-manifest.json'), canonicalManifest(manifest), { flag: 'wx', mode: 0o600 });
       const versionParent = join(this.directory, 'versions', hashBytes(`${manifest.resourceId}:${this.targetKey}`));
       assertSafeParents(versionParent); mkdirSync(versionParent, { recursive: true, mode: 0o700 });
       const versionDirectory = join(versionParent, hashBytes(manifest.version));
       if (existsSync(versionDirectory)) {
         assertSafeParents(versionDirectory);
-        verifyExtractedArchive(bytes, versionDirectory, this.options.limits);
+        if (manifest.format === 'raw-bootstrap-v1') {
+          const artifact = join(versionDirectory, 'artifact.bin');
+          const stat = lstatSync(artifact);
+          if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new Error('CATALOG_INSTALL_INTEGRITY');
+          await verifyArtifactFile(artifact, manifest);
+          this.checkGeneration(id, generation);
+        } else verifyExtractedArchive(bytes!, versionDirectory, this.options.limits);
         if (readFileSync(join(versionDirectory, '.an-manifest.json'), 'utf8') !== canonicalManifest(manifest)) throw new Error('CATALOG_VERSION_CONFLICT');
         rmSync(staging, { recursive: true, force: true }); staging = undefined;
       } else { renameSync(staging, versionDirectory); staging = undefined; }

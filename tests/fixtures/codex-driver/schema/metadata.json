@@ -1,0 +1,28 @@
+{
+  "runtime": "codex-cli",
+  "version": "0.159.2",
+  "generatorSha256": "1748767b230ebfc3d4ab7e4e254920d0c0ad9691fd8c11f190e7d44511a4a92e",
+  "evidenceKind": "offline-generated-schema-reused",
+  "generatedAt": "2026-10-12",
+  "sourceVersionNote": "Copied from the existing /tmp/an-approval-schema corpus after checking every P0 schema hash; no CLI was started or re-run. Scripted peers are synthetic.",
+  "files": {
+    "InitializeParams.json": "b55124e7c0f36a1789396daa5578217a92be67f053903696236686e59f6f212e",
+    "InitializeResponse.json": "62ad689c2cb6379913c1d72749cfd8de5089d35760214123518eb92eef11acc9",
+    "ThreadStartParams.json": "e9c6d3cc18d049bfbc0249add3808fb8e5a27e1a0b5a423767aafbc3859a9428",
+    "ThreadStartResponse.json": "70d9c9a3a064edb76662ec7cd066d142ed9252b768272bc3a7d00788386755c0",
+    "TurnStartParams.json": "2dfcf68705896fadc344ccfeb2e9fe5a6bcbbb8b9a90cf449ce232b636daf05a",
+    "TurnStartResponse.json": "12c5151421bb061297c9790ff795a44aa4b9bdb91fbb68012dcf0a08cf4198b1",
+    "TurnSteerParams.json": "857e7a2b061ae46ed6aedea6a5fddd3a6ce14f0334bf7eafaf10d4cbe68ec78b",
+    "TurnSteerResponse.json": "866ba9a77c12b5d570c837d58f73bf40b24e50fa93404bdf792dd984d313b1aa",
+    "TurnInterruptParams.json": "6dff382dae73d1dbc58406ed045605f647e7a49660e2540fbd2c6c24d60c5f2b",
+    "GetAccountParams.json": "30b545275f60975b55bd6fbaafd70f15505801d14168ee82d3931b6e93c78aab",
+    "GetAccountResponse.json": "c3092dd8e52c2933c5ba5f0bf92377174f65bed627ff4ef5d7c04a189dd34fd1",
+    "ClientNotification.json": "706cf248d75027c84a3c63348d0ed507182e8eba40069dd17541793de029145a",
+    "LoginAccountParams.json": "48fb9bea54d7e0890052653ac06737efb3200ba2261515b2c4014027f36bea3d",
+    "LoginAccountResponse.json": "72e6d77f49bc5809c3af50f183e2a0862dd8f7836816d4796ff69bb13eae0e89",
+    "CancelLoginAccountParams.json": "a4570a7542b82b918f69199f1e214ef747151c678473a5af58c58b088fdf58b6",
+    "CancelLoginAccountResponse.json": "06bc17624df01600fdc399d3c0f222f875c010d2d952c1d1191cb84de9b59014",
+    "AccountLoginCompletedNotification.json": "d81e8821fd5a4a9ad118dfc3506ea156d32dcb18da388b336501bbc6a5ccb4a6",
+    "TurnCompletedNotification.json": "016870158603b0f84bd9f8f65f927161c9fd5128e5ec632087616462dc44e085"
+  }
+}

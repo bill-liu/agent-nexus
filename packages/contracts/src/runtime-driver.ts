@@ -69,3 +69,6 @@ export interface DriverNativeAuthOptions {
 
 /** Authenticated Core sends an immutable full run bundle; guest never parses opaque references as config. */
 export interface PreparedDriverBundlePort {prepareRun(input:DriverStartTurn):Promise<void>;}
+
+/** Native turn observation only; never OS stop, exit-code, tool-effect or task-success evidence. */
+export interface DriverTerminalObservation extends NativeTurnMapping {status:'completed'|'interrupted'|'failed';}

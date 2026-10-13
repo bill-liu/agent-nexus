@@ -1,4 +1,4 @@
-name: P0 contracts and packaged Electron
+name: P0 and P1-A contracts and packaged Electron
 on:
   push:
     branches: [main]
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   contracts:
-    name: P0 logic and negative contracts (fake runtime)
+    name: Logic and negative contracts (synthetic only)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -27,7 +27,7 @@ jobs:
       - run: npm test
       - run: npm run build
   mac-electron:
-    name: Actual macOS Electron development package (fake runtime)
+    name: Actual macOS Electron package (P0 demo and P1 preparation)
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -50,7 +50,7 @@ jobs:
       - run: npm run test:electron
       - if: ${{ !cancelled() && steps.package.outcome == 'success' && steps.package_path.outcome == 'success' }}
         run: npm run test:mac
-      - name: Retain P0 validation evidence (not a release)
+      - name: Retain desktop validation evidence (not a release)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

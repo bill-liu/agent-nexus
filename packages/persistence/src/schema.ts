@@ -1,6 +1,6 @@
 export const coreSchema = `
 CREATE TABLE IF NOT EXISTS core_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-INSERT OR IGNORE INTO core_metadata VALUES ('schema_version',2),('epoch',0),('fencing_token',0);
+INSERT OR IGNORE INTO core_metadata VALUES ('schema_version',3),('epoch',0),('fencing_token',0);
 CREATE TABLE IF NOT EXISTS bot (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, owner TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
  accepting_tasks INTEGER NOT NULL DEFAULT 1 CHECK(accepting_tasks IN (0,1)),
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS bot (
 CREATE TABLE IF NOT EXISTS task (
  id TEXT PRIMARY KEY, bot_id TEXT NOT NULL REFERENCES bot(id), text TEXT NOT NULL,
  revision INTEGER NOT NULL DEFAULT 1,
- status TEXT NOT NULL CHECK(status IN ('QUEUED','RUNNING','VERIFYING','WAITING_INPUT','FAILED','CANCELLED'))
+ status TEXT NOT NULL CHECK(status IN ('QUEUED','RUNNING','VERIFYING','WAITING_INPUT','FAILED','CANCELLED','SUCCEEDED'))
 );
 CREATE TABLE IF NOT EXISTS bot_inbox (
  position INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL UNIQUE REFERENCES task(id),

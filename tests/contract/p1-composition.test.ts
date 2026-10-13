@@ -1,0 +1,28 @@
+import {it,expect} from 'vitest';
+import {mkdtempSync,realpathSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {Duplex} from 'node:stream';
+import {DatabaseSync} from 'node:sqlite';
+import {CoreStore} from '../../packages/core/src/store';
+import {P1Application,P1_APPLICATION_SCHEMA} from '../../packages/core/src/p1-application';
+import {createInstalledP1Capabilities} from '../../packages/core/src/p1-composition';
+import {DownloadManager} from '../../packages/catalog-client/src';
+import {GuestRuntimeRegistry} from '../../apps/runner/src/processes';
+import {serveNodeChannel,type NodeGuestEndpoint} from '../../apps/node-agent/src/channel';
+import {peer,commandRequest} from '../fixtures/codex-driver/harness';
+function pair(){let a:Duplex,b:Duplex;a=new Duplex({read(){},write(c,_e,done){b.push(c);done();}});b=new Duplex({read(){},write(c,_e,done){a.push(c);done();}});return [a,b] as const;}
+it('scripted installed assembly dispatches through guest durable Runner and returns native approval through sole Core authority',async()=>{
+ const dir=mkdtempSync(join(realpathSync(tmpdir()),'an-full-composition-')),path=join(dir,'core.sqlite');
+ const db=new DatabaseSync(':memory:'),protocol=peer();let guest:GuestRuntimeRegistry|undefined,endpoint:NodeGuestEndpoint|undefined,streams:readonly[Duplex,Duplex]|undefined;
+ const app=new P1Application(path,a=>createInstalledP1Capabilities(a,{assertAdmitted(){},vmHelper:{call:async()=>{throw Error('NO_REAL_VM');}},downloads:new DownloadManager({db:a.core.database,directory:join(dir,'downloads'),trustedKeys:new Map(),target:{os:'linux',arch:'arm64',provider:'macos-vm',nodeId:'node',appProtocol:1,runnerProtocol:2},source:{authorize:async()=>{throw Error('NO_DOWNLOAD');},read:async()=>{throw Error('NO_DOWNLOAD');}}}),provisionRequest(){throw Error('NO_PROVISION');},profile:()=>({projectId:'project',runtime:'codex-0.159.2',model:'synthetic',modelProvider:'synthetic',botDirectory:'/sandbox/bot',cwd:'/sandbox/project',candidateVersion:'candidate',budget:0,requireAccount:false,requireKnownBilling:false,context:{projectId:'project',projectPolicy:{mode:'restricted',locations:['openai']},permissions:{directories:[],network:[],tools:['read'],accounts:[],maxBytes:65536,requireApproval:true},rules:[],maxBytes:65536}}),async connectRun(r,sandboxId){
+  const binding={nodeId:'node',sandboxId,generation:r.generation,transportInstanceId:'scripted-transport',processInstanceId:'scripted-process',runId:r.id,fencingToken:r.fencingToken,sessionId:r.sessionId,turnId:r.turnId};streams=pair();const key=Buffer.alloc(32,7);guest=new GuestRuntimeRegistry({db,openNative:async b=>({...protocol,binding:b}),approvalPortFor:b=>endpoint!.approvalPort(b),commandAuthorizeNow(){},driverAuthorizeNow(){}});endpoint=serveNodeChannel(streams[1],key,{nodeId:binding.nodeId,sandboxId:binding.sandboxId,generation:binding.generation,transportInstanceId:binding.transportInstanceId},guest.transport,{observeStop:async()=>null},undefined,undefined,guest.driver,b=>guest!.authTransport(b),guest.bundles);return {stream:streams[0],key,binding,assertSandbox(){},assertRuntimeEnvironment(){}};
+ }}));
+ try{
+  await app.command({type:'bot.create',commandId:'create',scope:{botId:'bot'},expectedVersion:0,name:'Scripted assembly'},'local-user');app.registry.create({id:'connection',name:'Scripted native peer',provider:'openai',runtimeProfiles:['codex-0.159.2'],authMethod:'runtime_managed_login',billingSource:'unknown',billingEvidence:'unknown',route:'direct',endpoint:'https://example.invalid',allowedModels:['synthetic'],dataPolicy:'cloud_allowed',allowedNodes:['node'],fallbackPolicy:'deny',status:'ready',revision:1});app.grants.grant({id:'grant',connectionId:'connection',userId:'local-user',projectId:'project',botId:'bot',nodeId:'node',generation:1,action:'model.request',approvedBy:'local-user',expiresAt:Date.now()+60000,maxBudget:0});await app.command({type:'connection.select',commandId:'select',scope:{botId:'bot'},expectedVersion:1,connectionId:'connection'},'local-user');const initial=app.environment('bot');app.core.database.prepare('UPDATE bot_provision SET record=? WHERE operation_id=?').run(JSON.stringify({...initial,errorCode:undefined,stage:'ready',generation:1,evidenceKind:'live',liveReady:true,readinessObservedAt:Date.now(),readiness:{environment:true,runner:true,runtime:true,auth:true}}),initial.operationId);
+  await app.command({type:'work.submit',commandId:'work',scope:{botId:'bot'},expectedVersion:2,taskId:'task',text:'Scripted protocol only'},'local-user');expect(app.snapshot().schedulerError).toBeNull();await expect.poll(()=>protocol.frames.filter(f=>f.method==='turn/start').length).toBe(1);
+  expect(db.prepare("SELECT count(*) AS n FROM runner_bundles").get()?.n).toBe(1);expect(db.prepare("SELECT name FROM sqlite_master WHERE name='bot'").get()).toBeUndefined();
+  protocol.request(commandRequest());await expect.poll(()=>app.snapshot().approvals.length).toBe(1);const approval=app.snapshot().approvals[0];const command={type:'approval.decide',commandId:'window-one',scope:{botId:'bot'},expectedVersion:2,approvalId:approval.id,expectedRequestHash:approval.requestHash,decision:'APPROVED'};
+  await app.command(command,'local-user');await expect.poll(()=>protocol.effects).toBe(1);await expect(app.command({...command,commandId:'window-two'},'local-user')).rejects.toThrow('DECISION_CONFLICT');expect(protocol.effects).toBe(1);
+ }finally{guest?.stopScheduling();endpoint?.();streams?.forEach(s=>s.destroy());protocol.close();app.close();db.close();rmSync(dir,{recursive:true,force:true});}
+});

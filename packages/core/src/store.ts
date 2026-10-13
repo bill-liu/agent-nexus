@@ -148,6 +148,7 @@ export class CoreStore {
    return {bot,run};
   });
   if(!candidate)return null;
+  try{
   const prepared=await services.prepare({...candidate.run},candidate.bot.sandboxId);
   return this.write(()=>{
    const {run,bot:original}=candidate;const bot=this.bot(botId);
@@ -176,6 +177,7 @@ export class CoreStore {
    this.database.prepare("UPDATE bot_inbox SET state='CLAIMED' WHERE task_id=?").run(fixed.taskId);
    this.event('run.dispatched',fixed);this.event('run.start',command,command.commandId);return this.run(fixed.id);
   });
+  }catch(error){await services.discardPrepared?.({...candidate.run});throw error;}
  }
  executionBinding(runId: string): ExecutionBinding | null {
   const row=this.getRow('SELECT protocol_version,binding FROM run_execution_binding WHERE run_id=?',runId);

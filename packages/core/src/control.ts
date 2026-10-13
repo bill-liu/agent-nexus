@@ -1,5 +1,5 @@
 import type { ExecutionBinding } from '../../execution/src/contracts.js';
-export type TaskStatus = 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'WAITING_INPUT' | 'FAILED' | 'CANCELLED';
+export type TaskStatus = 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'WAITING_INPUT' | 'FAILED' | 'CANCELLED' | 'SUCCEEDED';
 export type RunState = 'DISPATCHED' | 'RUNNING' | 'LOST' | 'CANCEL_REQUESTED' | 'INTERRUPT_REQUESTED' | 'EXITED';
 export interface Bot { id: string; name: string; owner: string; version: number; acceptingTasks: boolean; dispatchPaused: boolean; sandboxId: string; generation: number }
 export interface Task { id: string; botId: string; text: string; revision: number; status: TaskStatus }

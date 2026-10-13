@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { canonicalJson } from '../../../packages/persistence/src/unit-of-work.js';
 export const hash = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 export interface ManifestEntry { path: string; kind: 'file' | 'directory'; digest: string; size: number }
+export interface SnapshotTransfer {candidateDigest:string;files:ManifestEntry[];contents:{path:string;data:string}[]}
 export interface CandidateSnapshot { ref: string; digest: string; path: string; files: ManifestEntry[] }
 function safePath(path: string): void {
  let part = resolve(path);
@@ -48,6 +49,14 @@ export class CandidateStore {
   const before = tree(source); const again = tree(source);
   if (canonicalJson(before.files) !== canonicalJson(again.files)) throw new Error('SNAPSHOT_MUTATED');
   return this.storeFiles(before.files, before.contents);
+ }
+ captureTransferred(input:SnapshotTransfer):CandidateSnapshot {
+  const invalid=():never=>{throw Error('INVALID_SNAPSHOT_TRANSFER');};
+  if(!input||!Array.isArray(input.files)||!Array.isArray(input.contents)||input.files.length>2048||hash(canonicalJson(input.files))!==input.candidateDigest)invalid();
+  const paths=new Set<string>();const contents=new Map<string,Buffer>();let bytes=0;
+  for(const entry of input.files){if(!entry||typeof entry.path!=='string'||!entry.path||entry.path.length>1024||entry.path.includes('\\')||entry.path.includes('\0')||entry.path.split('/').some(p=>!p||p==='.'||p==='..')||paths.has(entry.path)||!['file','directory'].includes(entry.kind)||!Number.isSafeInteger(entry.size)||entry.size<0||!/^[a-f0-9]{64}$/.test(entry.digest))invalid();paths.add(entry.path);if(entry.kind==='directory'&&(entry.size!==0||entry.digest!==hash('')))invalid();}
+  for(const item of input.contents){if(!item||typeof item.data!=='string'||contents.has(item.path))invalid();const entry=input.files.find(f=>f.path===item.path&&f.kind==='file');if(!entry)invalid();const value=Buffer.from(item.data,'base64');bytes+=value.length;if(bytes>16*1024*1024||value.toString('base64')!==item.data||value.length!==entry!.size||hash(value)!==entry!.digest)invalid();contents.set(item.path,value);}
+  if(input.files.filter(f=>f.kind==='file').length!==contents.size)invalid();return this.storeFiles(structuredClone(input.files),contents);
  }
  captureFile(source: string): CandidateSnapshot {
   const bytes = stableFile(source);

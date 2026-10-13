@@ -1,8 +1,8 @@
 {
   "name": "agent-nexus",
-  "version": "0.0.0-p0",
+  "version": "0.0.0-p1a",
   "private": true,
-  "description": "Agent Nexus macOS desktop P0 \u2014 fake runtimes only",
+  "description": "Agent Nexus macOS desktop — P1-A preparation with explicit live admission",
   "type": "module",
   "main": "build/main.cjs",
   "engines": {

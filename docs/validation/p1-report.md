@@ -50,10 +50,36 @@ A5 先行候选 [`7753f64`](https://github.com/bill-liu/agent-nexus/commit/7753f
 
 资源修正候选 `87c8881` 的 [Mac canary](https://github.com/bill-liu/agent-nexus/actions/runs/38330772167) 已越过资源检查，首个正确候选的原生报告将 C 逻辑表达式编码为整数 `1`，触发严格布尔断言失败。修正使用 `NSNumber numberWithBool` 显式编码，保留全部断言及 wire 类型校验；后续 CI 继续验证 15 个对照，未提前标 PASS。
 
-## 尚未完成
+## A2/A3/A5/A6：根集成候选
 
-- A2、A3 其余 Node/Provider、A5 和 A6 正在独立工作树实现/集成；A4 的实际 Mac canary 待 CI。未宣称 P1-A 整体完成。
-- A1 恢复后的真实 Run 保持 LOST，直到受信停写观察；没有新增基于不可信 alive 回执的恢复放行。
-- 标准 macOS CI 的工具链、实际 Electron 包与未来 VM/CLI live 验证分别记录。
-- Mac mini M4 与 `personal-codex-p1` 仅为 UNCONFIRMED 候选；设备操作、登录、账单来源、模型/数据/调用限制须有具名准入。无真实凭据、设备码或个人接入信息进入本仓库。
-- P1-B、真实 Task A/B、真实隔离/审批/恢复门禁与人工 Mac 项均未执行；本记录不宣称 P1 完成。
+2026-10-13 01:26 UTC，恢复原工作区并改为 GPT6.1-SOL high 单路推进；没有重新初始化或增加并行任务。根已按各 worker 的文件清单复用代码和既有审查，并补全接线。
+
+| requirement_id / stage / evidence_kind | 实现与实际验证 |
+|---|---|
+| A2；GATE03–09/18/19 协议子集 / P1-A / offline-schema + synthetic | 固定 Codex 0.159.2 schema、持久 ACK/claim/未知结果、独立 guest SQLite/Runner、原生精确审批与 Core 唯一权威、官方临时认证 facade；撤权/到期/排队失效回验。独立审查的三个审批问题已复验修复。新增终端事件先独立持久保存，再向有界 spool 发布；满容量/重开/确认后恢复测试通过。终端状态不提供停写证明。 |
+| A3；GATE07/08/13/19 代码子集 / P1-A / synthetic + source-check | VM Provider/helper、签名/摘要固定的 bootstrap 下载复用、Node 私有配置/进程注册表、认证 Unix/vsock 通道、执行前 cgroup/BPF gate、当前隔离/环境 attestation 与完整停写观察。guest 实际入口接通 Runner、Driver、CoreApprovalPort、spool、终端 EOF 和可信 cgroup stop。测试不声称实际 VM/BPF 可用。 |
+| A5；GATE01 机制 / P1-A / synthetic-subprocess | 固定 Task A/B oracle、精确未提交快照、不可篡改报告、同 Core SUCCEEDED 受控迁移。正确/错误候选、旧候选/契约、Bot PASS 文件、篡改/并发修改、待审批/活动写者和 A→B 依赖均有对照。默认测试包含 10 项 evidence integration。 |
+| A6；GATE02/16/17 代码子集 / P1-A / synthetic | 默认 P0 演示保留；显式 P1 准备使用一个独立 Core DB。持久创建/环境状态/Connection 选择/资产绑定与快照/队列/审批拒绝中断/只读证据接通。临时官方授权走专用 Main/Core 通路，代码不进入普通快照/SQLite；只读窗口和扩展参数拒绝。真实原生授权的 installed factory 尚无 live 正向证据。 |
+| v1/v2→v3 / P1-A / synthetic SQLite | 显式重建 Task CHECK，保留 Run/inbox/outbox/message/receipt/审批及执行绑定；新表复用同 Core。外键在事务外切换，提交前完整检查，损坏前置状态回滚并恢复 FK。4 个迁移测试 RED→GREEN；不在构造器重复安装局部 schema。 |
+
+根补充修正：Runner spool 通过认证通道回放，在 Core 短事务保存 cursor/元数据后才确认，收据丢失可幂等重放；取消/中断即使原生 interrupt 拒绝仍到达同一绑定的 Node stop。受信终端回调只请求精确 app-server EOF，成功仍取决于实际 OS 全进程树和退出状态。A2 原压力修复的独立复审因额度中断未完成；根定向测试/自审已完成，不冒称独立清场。失败预检在 SQL 外清理同一未提交会话，未知停写保留映射并阻止再开；定时协调仅重试 owned cleanup，不重跑模型动作。活动登录期间拒绝切换 Connection；拿不到迁移写锁也恢复 FK。
+
+候选来源也已补全：Node 在固定私有 workspace、全树无写者时建立精确快照，经认证有界通道导出，Core 逐项重验摘要/路径/字节后保存。Renderer 不提供 workspace、oracle 或报告路径。Task B 初始化前核对当前 workspace 摘要等于已验收 A，保存其 input 摘要；验收再次核对相同 A 依赖。当前传输限制为 160000 字节，超限明确 BLOCKED，不能截断后验收。
+
+Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/agent-nexus/actions/runs/38331047122) 已通过 7 个对照，在宿主桥断言发现 JavaScriptCore 自带 console object。根不放宽断言，改为在候选执行前删除并封闭全部 host-facing 全局名；无法移除即 BLOCKED。待本集成候选的实际 Mac CI 完整验证。
+
+根本次最终本地命令：`npm run typecheck`、`npm test` **42 文件 / 524 项**、`npm run build`、`git diff --check` 全部退出 0。原生 verifier/helper 的 Mac 结果、实际 Electron 包和人工/live 结果另列，不合并为整体 PASS。esbuild 版本与依赖图不变，开发包包含固定编译器及其可执行文件的 unpacked 路径，只转换文本；没有在 Node 执行候选。
+
+审查范围：A1/A4 已完成独立审查；A2 原三个 Important 已独立复验；A3 初步审查无立即阻止代码/CI 发布的 Critical，但完整审查因额度中断；A5 原 Critical 已据复现修正，原生版本独立复审未完成；根按用户“单路、不新增并行任务”要求完成剩余自审。不能将自审表述为独立审查通过。
+
+## 当前限制与 P1-B 门禁
+
+- 用户 Mac、VM 安装/启动、guest 官方 CLI 初始化、登录、账号/凭证、模型及实际 Task A/B 均 **NOT_RUN/BLOCKED**。Mac mini M4 和 `personal-codex-p1` 仍是 UNCONFIRMED 候选。
+- 真实装配仅面向另行准备并授权的单一 Codex guest。无人值守 guest 初装、同次主机启动 helper 崩溃后的完整恢复、细于 IP 的网关、每 Bot 文件系统配额尚未支持。原生 verifier 未证明硬物理内存上限。UNKNOWN 不伪装为停止或成功。
+- 金额预算/Runtime 回报不证明请求数、Token 或费用硬上限；真实端点/route、计费适用性与可执行限制仍须 B 准入核验，必要时补选定路径的实现。不许因给出配置文件就跳过这些门禁。
+- Task A/B 实际 workspace 传输、当前 Runtime/环境 attestation、EOF 行为、隔离/网络正负对照、取消与恢复必须在获准目标取得 live 证据；有调用代码不表示这些场景已经跑通。
+- 资料默认仅本机。准备 scope 的材料不会自动换绑到真实项目；远程处理须另行明确政策，当前文本 Skill 不授予脚本权限。更完整的资料编辑/政策调整、其他 CLI/API/网关和生产发布不在本次实现范围。
+- A1 恢复后真实 Run 保持 LOST，直到可信停写观察；没有基于不可信 alive 的恢复放行。
+- [人工 Mac 清单](p0-manual-mac-checklist.md) 均 NOT_RUN；自动化不能代填 IME/VoiceOver/多屏/睡眠结果。P0 记录未改写。
+
+本候选交付 P1-A 实现与无账号验证材料，尚待该 SHA 的完整 Mac CI。已知未支持路径、未完成独立复审及所有 B/live/人工缺口保留；**不宣称 P1 完成**。

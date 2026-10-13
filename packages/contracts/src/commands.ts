@@ -7,6 +7,9 @@ export type Command = Base & (
  | {type:'bot.pause';paused:boolean}
  | {type:'bot.accept';accepting:boolean}
  | {type:'run.cancel';runId:string}
+ | {type:'run.interrupt';runId:string}
+ | {type:'connection.select';connectionId:string}
+ | {type:'approval.decide';approvalId:string;expectedRequestHash:string;decision:'APPROVED'|'DENIED'}
 );
 export type Input<T extends Command['type']> = Omit<Extract<Command,{type:T}>,'type'>;
 function object(value:unknown):Record<string,unknown> { if(!value || typeof value!=='object' || Array.isArray(value)) throw Error('INVALID_SCHEMA');return value as Record<string,unknown>; }
@@ -15,7 +18,7 @@ function id(value:unknown):asserts value is string {if(typeof value!=='string' |
 export function parseCommand(value:unknown):Command {
  let encoded:string;try{encoded=JSON.stringify(value);}catch{throw Error('INVALID_SCHEMA');}
  if(typeof encoded!=='string' || new TextEncoder().encode(encoded).length>MAX_PAYLOAD_BYTES)throw Error('PAYLOAD_TOO_LARGE');
- const v=object(value); const fields:Record<string,string[]>={'bot.create':['name'],'work.submit':['taskId','text'],'bot.pause':['paused'],'bot.accept':['accepting'],'run.cancel':['runId']};
+ const v=object(value); const fields:Record<string,string[]>={'bot.create':['name'],'work.submit':['taskId','text'],'bot.pause':['paused'],'bot.accept':['accepting'],'run.cancel':['runId'],'run.interrupt':['runId'],'connection.select':['connectionId'],'approval.decide':['approvalId','expectedRequestHash','decision']};
  if(typeof v.type!=='string' || !Object.hasOwn(fields,v.type))throw Error('UNKNOWN_COMMAND');
  exact(v,['type','commandId','scope','expectedVersion',...fields[v.type]!]);id(v.commandId);const scope=object(v.scope);exact(scope,['botId']);id(scope.botId);
  if(!Number.isSafeInteger(v.expectedVersion) || (v.expectedVersion as number)<(v.type==='bot.create'?0:1))throw Error('INVALID_VERSION');
@@ -23,6 +26,8 @@ export function parseCommand(value:unknown):Command {
  if(v.type==='work.submit'){id(v.taskId);if(typeof v.text!=='string' || !v.text.trim() || v.text.length>12000)throw Error('INVALID_TEXT');}
  if(v.type==='bot.pause' && typeof v.paused!=='boolean')throw Error('INVALID_SCHEMA');
  if(v.type==='bot.accept' && typeof v.accepting!=='boolean')throw Error('INVALID_SCHEMA');
- if(v.type==='run.cancel')id(v.runId);
+ if(v.type==='run.cancel'||v.type==='run.interrupt')id(v.runId);
+ if(v.type==='connection.select'){if(typeof v.connectionId!=='string'||!v.connectionId||v.connectionId.length>160)throw Error('INVALID_ID');}
+ if(v.type==='approval.decide'){if(typeof v.approvalId!=='string'||!v.approvalId||v.approvalId.length>256||typeof v.expectedRequestHash!=='string'||! /^[a-f0-9]{64}$/.test(v.expectedRequestHash)||!['APPROVED','DENIED'].includes(String(v.decision)))throw Error('INVALID_SCHEMA');}
  return v as Command;
 }

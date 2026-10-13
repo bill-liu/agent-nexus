@@ -1,0 +1,28 @@
+import {DatabaseSync} from 'node:sqlite';
+import {lstatSync,existsSync,openSync,closeSync,realpathSync,constants} from 'node:fs';
+import {join,resolve} from 'node:path';
+import {NodeController,type NodeAuthority,type SandboxPolicy} from './control.js';
+import {listenNode,readProtectedJSON} from './server.js';
+import {serveNodeChannel,type NodeGuestEndpoint} from './channel.js';
+import {GuestRuntimeRegistry} from '../../runner/src/processes.js';
+import type {ExecutionBinding} from '../../../packages/execution/src/contracts.js';
+export interface P1GuestConfiguration {version:1;listenConfigPath:string;runnerDirectory:string;botId:string;projectId:string;connectionId:string;grantId:string;expiresAt:number;actions:('initialize-runtime'|'model.request'|'login')[];authority:NodeAuthority;policy:SandboxPolicy}
+/** Only explicit protected installation config. Never called from an Agent or Renderer message. */
+export function readP1GuestConfiguration(path:string):P1GuestConfiguration {
+ const c=readProtectedJSON<P1GuestConfiguration>(path);const keys=['version','listenConfigPath','runnerDirectory','botId','projectId','connectionId','grantId','expiresAt','actions','authority','policy'];
+ if(!c||Object.keys(c).length!==keys.length||keys.some(k=>!Object.hasOwn(c,k))||c.version!==1||!Number.isSafeInteger(c.expiresAt)||c.expiresAt<=Date.now()||!Array.isArray(c.actions)||!c.actions.includes('initialize-runtime')||c.actions.some(a=>!['initialize-runtime','model.request','login'].includes(a))||!['botId','projectId','connectionId','grantId'].every(k=>typeof c[k as keyof P1GuestConfiguration]==='string'&&String(c[k as keyof P1GuestConfiguration]).length>0)||!c.authority||!c.policy)throw Error('GUEST_CONFIGURATION_INVALID');
+ if(c.listenConfigPath!==resolve(c.listenConfigPath)||c.runnerDirectory!==resolve(c.runnerDirectory)||!c.authority.stateDirectory||c.authority.authorization.expiresAt<c.expiresAt)throw Error('GUEST_CONFIGURATION_INVALID');
+ const directory=lstatSync(c.runnerDirectory);if(!directory.isDirectory()||directory.isSymbolicLink()||(directory.mode&0o077)!==0||directory.uid!==process.getuid?.()||realpathSync(c.runnerDirectory)!==c.runnerDirectory)throw Error('GUEST_PRIVATE_STORAGE_REQUIRED');
+ for(const mount of [c.policy.home,c.policy.project,c.policy.cache,c.policy.rootfs]){const a=resolve(c.runnerDirectory),b=resolve(mount);if(a===b||a.startsWith(b+'/')||b.startsWith(a+'/'))throw Error('GUEST_PRIVATE_STORAGE_REQUIRED');}
+ return structuredClone(c);
+}
+/** Executed only by the separately admitted guest service installation. No Core database in the guest. */
+export function startP1Guest(configurationPath:string){
+ const c=readP1GuestConfiguration(configurationPath);if(process.platform!=='linux')throw Error('BLOCKED_GUEST_TARGET_REQUIRED');
+ const path=join(c.runnerDirectory,'runner.sqlite');if(!existsSync(path)){const fd=openSync(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);closeSync(fd);}const st=lstatSync(path);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||(st.mode&0o077)!==0||st.uid!==process.getuid?.())throw Error('GUEST_PRIVATE_STORAGE_REQUIRED');
+ const db=new DatabaseSync(path);db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');const controller=new NodeController(c.authority);let endpoint:NodeGuestEndpoint|undefined;
+ const authorize=(binding:ExecutionBinding,action:'initialize-runtime'|'model.request'|'login')=>{if(c.expiresAt<=Date.now()||!c.actions.includes(action)||binding.nodeId!==c.authority.nodeId||binding.sandboxId!==c.authority.sandboxId||binding.generation!==c.authority.generation)throw Error('GUEST_ADMISSION_REQUIRED');};
+ const registry=new GuestRuntimeRegistry({db,openNative:async binding=>{authorize(binding,'initialize-runtime');return controller.openNative(binding,c.policy);},approvalPortFor:binding=>{if(!endpoint)throw Error('CORE_APPROVAL_UNAVAILABLE');return endpoint.approvalPort(binding);},driverAuthorizeNow:binding=>authorize(binding,'initialize-runtime'),commandAuthorizeNow:command=>{if(!command.executionBinding)throw Error('REAL_BINDING_REQUIRED');authorize(command.executionBinding,command.type==='run.start'?'model.request':'initialize-runtime');if(command.botId!==c.botId)throw Error('GUEST_SCOPE_MISMATCH');if(command.type==='run.start'){const row=db.prepare('SELECT payload FROM runner_bundles WHERE run_id=?').get(command.runId);if(!row)throw Error('PREPARED_BUNDLE_REQUIRED');const bundle=JSON.parse(String(row.payload));if(bundle.approvalBinding.subjectId!=='local-user'||bundle.approvalBinding.botId!==c.botId||bundle.approvalBinding.projectId!==c.projectId||bundle.approvalBinding.connectionId!==c.connectionId||bundle.approvalBinding.grantId!==c.grantId)throw Error('GUEST_SCOPE_MISMATCH');}},nativeAuthFor:binding=>({authorizeOperation:()=>authorize(binding,'login')}),stopNative:binding=>controller.stop(binding),onTerminal:async observation=>{await controller.finishNative(observation.binding);}});
+ const server=listenNode(c.listenConfigPath,(stream,key,binding)=>{if(binding.nodeId!==c.authority.nodeId||binding.sandboxId!==c.authority.sandboxId||binding.generation!==c.authority.generation)throw Error('GUEST_SCOPE_MISMATCH');endpoint=serveNodeChannel(stream,key,binding,registry.transport,controller,undefined,undefined,registry.driver,b=>registry.authTransport(b),registry.bundles,{attestRuntime:b=>controller.attestNative(b,c.policy),finishNative:b=>controller.finishNative(b),stopNative:b=>controller.stop(b),captureCandidate:b=>controller.captureCandidate(b,c.policy)},registry.runner.spool);return endpoint;});
+ return {server:server.server,async close(){registry.stopScheduling();await server.close();db.close();}};
+}

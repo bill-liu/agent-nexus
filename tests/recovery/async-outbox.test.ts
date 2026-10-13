@@ -117,7 +117,7 @@ test('v1_schema_and_fake_outbox_migrate_without_relabeling_fake_as_real',async()
  const run=core.dispatch('bot',r=>({contextManifestRef:`fake:${r.id}`,resolvedConnectionRef:`fake:${r.id}`}))!;const command=core.pendingCommands()[0]!;
  // Reconstruct the P0 v1 schema shape with its already committed inbox/run/outbox.
  core.database.exec("DROP TABLE run_execution_binding; UPDATE core_metadata SET value=1 WHERE key='schema_version'");core.close();core=new CoreStore(join(dir,'core.db'));
- expect(core.database.prepare("SELECT value FROM core_metadata WHERE key='schema_version'").get()?.value).toBe(2);
+ expect(core.database.prepare("SELECT value FROM core_metadata WHERE key='schema_version'").get()?.value).toBe(3);
  expect(core.pendingCommands()[0]).toEqual(command);expect(core.executionBinding(run.id)).toBeNull();expect(command.protocolVersion).toBeUndefined();
  const runner=new FakeRuntime(':memory:');try{runner.receive(command);await core.flushOutboxAsync(adaptSyncRunner(runner),services());expect(runner.receipts()).toHaveLength(1);expect(core.snapshot().runs[0]?.slotHeld).toBe(true);}finally{runner.close();}
 });
@@ -125,4 +125,8 @@ test('real_binding_survives_restart_and_legacy_exit_cannot_release_it',async()=>
  const run=(await core.dispatchAsync('bot',services()))!;const binding=core.executionBinding(run.id);core.close();core=new CoreStore(join(dir,'core.db'));
  expect(core.executionBinding(run.id)).toEqual(binding);
  expect(()=>core.observeExit(run.id,run.fencingToken,{kind:'process-exit',source:'fake-runner',exitCode:0})).toThrow('TRUSTED_NODE_OBSERVATION_REQUIRED');expect(core.snapshot().runs[0]?.slotHeld).toBe(true);
+});
+test('failed asynchronous preparation is retired outside SQL before another attempt',async()=>{
+ const core=new CoreStore(':memory:');let retired:any;try{core.createBot({commandId:'cleanup-create',botId:'cleanup-bot',name:'Cleanup',subject:'owner'});core.submit({commandId:'cleanup-work',taskId:'cleanup-task',botId:'cleanup-bot',text:'Synthetic',expectedVersion:1,subject:'owner'});
+ await expect(core.dispatchAsync('cleanup-bot',{prepare:async()=>{throw Error('AUTH_REQUIRED');},authorizeNow(){},discardPrepared:async r=>{expect(core.database.isTransaction).toBe(false);retired=r;}})).rejects.toThrow('AUTH_REQUIRED');expect(retired.botId).toBe('cleanup-bot');expect(core.snapshot().runs).toEqual([]);expect(core.snapshot().tasks[0].status).toBe('QUEUED');}finally{core.close();}
 });

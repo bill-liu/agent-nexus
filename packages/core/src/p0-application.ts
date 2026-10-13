@@ -59,6 +59,7 @@ export class P0Application {
     const run=this.core.snapshot().runs.find(r=>r.id===command.runId&&r.botId===botId);if(!run)throw Error('NOT_AUTHORIZED');
     result=this.core.requestCancel(run.id,{commandId:command.commandId,expectedVersion:command.expectedVersion,subject});break;
    }
+   default:throw Error('P1_COMMAND_UNAVAILABLE');
   }
   if(runScheduler){
    try{this.pump();}catch(error){

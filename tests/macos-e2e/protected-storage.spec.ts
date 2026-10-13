@@ -46,3 +46,16 @@ test('actual packaged Mac safeStorage protects a temporary synthetic credential'
   await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();
  }
 });
+
+test('packaged verifier compiler transforms text using its unpacked fixed tool without executing source',async()=>{
+ const {app,cleanup}=await launchPackaged();
+ try{const result=await app.evaluate(({app})=>{
+  const {createRequire}=process.getBuiltinModule('node:module')!;const {join,dirname}=process.getBuiltinModule('node:path')!;
+  const require=createRequire(join(app.getAppPath(),'package.json'));
+  process.env.ESBUILD_BINARY_PATH=join(dirname(app.getAppPath()),`app.asar.unpacked/node_modules/@esbuild/darwin-${process.arch}/bin/esbuild`);
+  const {compileCandidate}=require(join(app.getAppPath(),'build/verifier-compiler.cjs'));
+  const code=compileCandidate("throw new Error('MUST_NOT_EXECUTE');export function exportRecords(a){return a.slice()}");
+  return {transformed:code.includes('module.exports.exportRecords'),containsUnevaluatedThrow:code.includes('MUST_NOT_EXECUTE')};
+ });expect(result).toEqual({transformed:true,containsUnevaluatedThrow:true});}
+ finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});cleanup();}
+});

@@ -28,6 +28,8 @@ export interface PreparedExecution {
 }
 export interface AsyncExecutionServices {
  prepare(run: Run, sandboxId: string): Promise<PreparedExecution>;
+ /** Retire only this uncommitted preparation outside SQL; unknown stop must reject. */
+ discardPrepared?(run:Run):Promise<void>;
  /** Current Grant/revision/lease check; no async work or cached allow decision here. */
  authorizeNow(command: ExecutionCommand): void;
  preflight?(command: ExecutionCommand): Promise<void>;
