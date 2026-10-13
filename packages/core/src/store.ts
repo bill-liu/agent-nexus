@@ -1,3 +1,6 @@
+import { OutboxDispatcher } from './outbox-dispatcher.js';
+import { assertExecutionBinding, assertExecutionProtocol, assertRunnerReceipt, assertTrustedStop } from '../../execution/src/runner-client.js';
+import type { AsyncRunnerTransport, AsyncExecutionServices, ExecutionBinding, TrustedNodeVerifier } from '../../execution/src/contracts.js';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import { migrateCore } from '../../persistence/src/migrations.js';
@@ -19,6 +22,7 @@ export class CoreStore {
  readonly database: DatabaseSync;
  readonly epoch: number;
  private closed = false;
+ private flushing: Promise<RunnerReceipt[]> | null = null;
 
  constructor(path: string) {
   this.database = new DatabaseSync(path);
@@ -129,8 +133,119 @@ export class CoreStore {
    const run = this.run(runId);this.event('run.dispatched',run);this.event('run.start',this.execution(run,commandId,'run.start'),commandId);return run;
   });
  }
+ /** Reserve immutable identities in a short transaction, inspect externally, then compare the exact candidate. */
+ async dispatchAsync(botId: string, services: AsyncExecutionServices): Promise<Run | null> {
+  if(this.database.isTransaction)throw new Error('ASYNC_TRANSACTION_FORBIDDEN');
+  const candidate=this.write(()=>{
+   const bot=this.bot(botId);
+   if(bot.dispatchPaused || this.getRow('SELECT id FROM run WHERE bot_id=? AND slot_held=1',botId))return null;
+   const inbox=this.getRow("SELECT task_id FROM bot_inbox WHERE bot_id=? AND state='QUEUED' ORDER BY position LIMIT 1",botId);
+   if(!inbox)return null;
+   const task=this.task(String(inbox.task_id));
+   this.database.exec("UPDATE core_metadata SET value=value+1 WHERE key='fencing_token'");
+   const id=`run-${randomUUID()}`;
+   const run:Run={id,botId,taskId:task.id,taskRevision:task.revision,commandId:`start:${id}`,fencingToken:this.metadata('fencing_token'),generation:bot.generation,ownerEpoch:this.epoch,leaseExpiresAt:Date.now()+60000,sessionId:`session-${randomUUID()}`,turnId:`turn-${randomUUID()}`,state:'DISPATCHED',slotHeld:true,version:1,lastSequence:0,stopKind:null,contextManifestRef:'',resolvedConnectionRef:''};
+   return {bot,run};
+  });
+  if(!candidate)return null;
+  const prepared=await services.prepare({...candidate.run},candidate.bot.sandboxId);
+  return this.write(()=>{
+   const {run,bot:original}=candidate;const bot=this.bot(botId);
+   const assertCandidate=()=>{
+    const current=this.bot(botId);const task=this.task(run.taskId);
+    const head=this.getRow("SELECT task_id FROM bot_inbox WHERE bot_id=? AND state='QUEUED' ORDER BY position LIMIT 1",botId);
+    if(current.version!==original.version || current.dispatchPaused || current.generation!==run.generation || current.sandboxId!==original.sandboxId || head?.task_id!==run.taskId || task.revision!==run.taskRevision || task.status!=='QUEUED' || this.getRow('SELECT id FROM run WHERE bot_id=? AND slot_held=1',botId))throw new Error('DISPATCH_CANDIDATE_STALE');
+   };
+   assertCandidate();
+   if(!prepared)throw new Error('PREPARATION_REQUIRED');
+   const now=Date.now();
+   if(!Number.isSafeInteger(prepared.verifiedAt) || prepared.verifiedAt>now || now-prepared.verifiedAt>30000 || !Number.isSafeInteger(prepared.expiresAt) || prepared.expiresAt<=now || run.leaseExpiresAt<=now)throw new Error('PREPARATION_STALE');
+   assertExecutionBinding(prepared.binding);
+   const binding=prepared.binding;
+   if(binding.sandboxId!==bot.sandboxId || binding.generation!==run.generation || binding.runId!==run.id || binding.fencingToken!==run.fencingToken || binding.sessionId!==run.sessionId || binding.turnId!==run.turnId)throw new Error('EXECUTION_BINDING_MISMATCH');
+   this.text(prepared.contextManifestRef,256);this.text(prepared.resolvedConnectionRef,256);
+   const fixed={...run,contextManifestRef:prepared.contextManifestRef,resolvedConnectionRef:prepared.resolvedConnectionRef,leaseExpiresAt:Math.min(run.leaseExpiresAt,prepared.expiresAt)};
+   const command:ExecutionCommand={...this.execution(fixed,fixed.commandId,'run.start'),protocolVersion:2,executionBinding:{...binding}};
+   const result:unknown=services.authorizeNow(command);
+   if(result && typeof result==='object' && 'then' in result)throw new Error('ASYNC_AUTHORIZATION_FORBIDDEN');
+   this.own();assertCandidate();
+   this.database.prepare("INSERT INTO run(id,bot_id,task_id,task_revision,command_id,fencing_token,generation,owner_epoch,lease_expires_at,session_id,turn_id,state,slot_held,context_manifest_ref,resolved_connection_ref) VALUES (?,?,?,?,?,?,?,?,?,?,?,'DISPATCHED',1,?,?)")
+    .run(fixed.id,botId,fixed.taskId,fixed.taskRevision,fixed.commandId,fixed.fencingToken,fixed.generation,this.epoch,fixed.leaseExpiresAt,fixed.sessionId,fixed.turnId,fixed.contextManifestRef,fixed.resolvedConnectionRef);
+   this.database.prepare('INSERT INTO run_execution_binding VALUES (?,2,?)').run(fixed.id,canonicalJson(binding));
+   this.database.prepare("UPDATE task SET status='RUNNING' WHERE id=?").run(fixed.taskId);
+   this.database.prepare("UPDATE bot_inbox SET state='CLAIMED' WHERE task_id=?").run(fixed.taskId);
+   this.event('run.dispatched',fixed);this.event('run.start',command,command.commandId);return this.run(fixed.id);
+  });
+ }
+ executionBinding(runId: string): ExecutionBinding | null {
+  const row=this.getRow('SELECT protocol_version,binding FROM run_execution_binding WHERE run_id=?',runId);
+  if(!row)return null;if(row.protocol_version!==2)throw new Error('UNSUPPORTED_EXECUTION_PROTOCOL');
+  return JSON.parse(String(row.binding)) as ExecutionBinding;
+ }
+ flushOutboxAsync(runner: AsyncRunnerTransport, services: Pick<AsyncExecutionServices,'authorizeNow'|'preflight'>, limit=100): Promise<RunnerReceipt[]> {
+  if(this.database.isTransaction)return Promise.reject(new Error('ASYNC_TRANSACTION_FORBIDDEN'));
+  if(this.flushing)return this.flushing;
+  this.flushing=new OutboxDispatcher(this,runner,services).flush(limit).finally(()=>{this.flushing=null;});return this.flushing;
+ }
+ /** Privileged dispatcher port: compare against the persisted command, never accept caller replacement. */
+ assertAsyncCommand(command: ExecutionCommand, sending=false): void {
+  this.own();assertExecutionProtocol(command);
+  const stored=this.getRow('SELECT payload FROM outbox_event WHERE command_id=?',command.commandId);
+  if(!stored || digest(JSON.parse(String(stored.payload)))!==digest(command))throw new Error('OUTBOX_COMMAND_MISMATCH');
+  const run=this.run(command.runId);const binding=this.executionBinding(run.id);const bot=this.bot(run.botId);
+  if(binding && (command.protocolVersion!==2 || canonicalJson(binding)!==canonicalJson(command.executionBinding)))throw new Error('EXECUTION_BINDING_MISMATCH');
+  if(sending && (command.type==='run.start'||command.type==='message.send') && !run.stopKind){
+   if(run.ownerEpoch!==this.epoch || run.state==='LOST')throw new Error('STATE_UNKNOWN');
+   if(command.expiresAt<=Date.now())throw new Error('EXPIRED_COMMAND');
+   if(bot.generation!==command.generation || (binding && bot.sandboxId!==binding.sandboxId))throw new Error('EXECUTION_BINDING_MISMATCH');
+  }
+ }
+ suppressStoppedCommand(command: ExecutionCommand): boolean {
+  return this.write(()=>{
+   const run=this.run(command.runId);
+   if((command.type!=='run.start' && command.type!=='message.send') || (!run.stopKind && run.slotHeld))return false;
+   this.database.prepare('UPDATE outbox_event SET delivered=1 WHERE command_id=?').run(command.commandId);
+   if(command.messageId)this.database.prepare("UPDATE message SET status='REJECTED',reason='RUN_STOP_REQUESTED' WHERE id=? AND status='QUEUED'").run(command.messageId);
+   this.event('command.suppressed',{commandId:command.commandId,runId:command.runId,reason:'RUN_STOP_REQUESTED'});return true;
+  });
+ }
+ acceptAsyncReceipt(command: ExecutionCommand,receipt: RunnerReceipt): void {
+  this.write(()=>{
+   this.assertAsyncCommand(command);assertRunnerReceipt(command,receipt);
+   const run=this.run(command.runId);
+   // Receipts attest to command acceptance, never to OS process-tree termination.
+   if(this.executionBinding(run.id) && receipt.exitEvidence)throw new Error('TRUSTED_NODE_OBSERVATION_REQUIRED');
+   this.database.prepare('UPDATE outbox_event SET delivered=1 WHERE command_id=?').run(command.commandId);
+   if(command.type==='run.start' && run.slotHeld && !run.stopKind){
+    if(run.state!=='LOST')this.database.prepare('UPDATE run SET state=?,version=version+1 WHERE id=?').run(receipt.state==='ACCEPTED'?'RUNNING':'LOST',run.id);
+    this.event('run.receipt',receipt);
+   }
+   if(command.type==='message.send' && command.messageId){
+    const stopped=!!run.stopKind || !run.slotHeld;
+    this.database.prepare("UPDATE message SET status=?,reason=? WHERE id=? AND status='QUEUED'").run(stopped?'REJECTED':receipt.state==='ACCEPTED'?'DELIVERED':'REJECTED',stopped?'RUN_STOP_REQUESTED':receipt.reason??null,command.messageId);
+    this.event('message.delivery',this.message(command.messageId));
+   }
+   if(!this.executionBinding(run.id) && (command.type==='run.cancel'||command.type==='run.interrupt') && receipt.state==='ACCEPTED' && receipt.exitEvidence)this.exit(run,receipt.exitEvidence);
+  });
+ }
+ async observeTrustedStop(runId: string,evidenceRef: string,verifier: TrustedNodeVerifier): Promise<Run> {
+  if(this.database.isTransaction)throw new Error('ASYNC_TRANSACTION_FORBIDDEN');
+  this.own();const run=this.run(runId);const binding=this.executionBinding(runId);
+  if(!binding)throw new Error('REAL_EXECUTION_BINDING_REQUIRED');this.text(evidenceRef,256);
+  const requestedAt=Date.now();
+  const observation=await verifier.observeStop({...binding},evidenceRef);
+  assertTrustedStop(binding,evidenceRef,observation,requestedAt);
+  return this.write(()=>{
+   const current=this.fencedRun(runId,run.fencingToken);const bot=this.bot(current.botId);
+   if(canonicalJson(this.executionBinding(runId))!==canonicalJson(binding) || bot.sandboxId!==binding.sandboxId || bot.generation!==binding.generation)throw new Error('STOP_OBSERVATION_BINDING_MISMATCH');
+   assertTrustedStop(binding,evidenceRef,observation,requestedAt);
+   if(!current.slotHeld)return current;
+   return this.completeExit(current,observation,observation.processTree.state==='stopped' && observation.exitCode!==0);
+  });
+ }
  private execution(run: Run, commandId: string, type: ExecutionCommand['type']): ExecutionCommand {
-  return {commandId,type,runId:run.id,botId:run.botId,taskId:run.taskId,taskRevision:run.taskRevision,fencingToken:run.fencingToken,generation:run.generation,sessionId:run.sessionId,turnId:run.turnId,expiresAt:run.leaseExpiresAt,contextManifestRef:run.contextManifestRef,resolvedConnectionRef:run.resolvedConnectionRef};
+  const binding=this.executionBinding(run.id);
+  return {...(binding?{protocolVersion:2 as const,executionBinding:binding}:{}),commandId,type,runId:run.id,botId:run.botId,taskId:run.taskId,taskRevision:run.taskRevision,fencingToken:run.fencingToken,generation:run.generation,sessionId:run.sessionId,turnId:run.turnId,expiresAt:run.leaseExpiresAt,contextManifestRef:run.contextManifestRef,resolvedConnectionRef:run.resolvedConnectionRef};
  }
  pendingCommands(limit = 100): ExecutionCommand[] {
   this.bound(limit);
@@ -139,6 +254,7 @@ export class CoreStore {
  flushOutbox(runner: RunnerTransport, authorize?: (command: ExecutionCommand) => void, limit = 100): RunnerReceipt[] {
   this.own();const receipts: RunnerReceipt[] = [];
   for (const command of this.pendingCommands(limit)) {
+   if(this.executionBinding(command.runId))throw new Error('ASYNC_TRANSPORT_REQUIRED');
    const current = this.run(command.runId);
    if ((command.type === 'run.start' || command.type === 'message.send') && (current.stopKind || !current.slotHeld)) {
     // Querying an existing effect is safe; never start or steer stopped work on a retry.
@@ -201,10 +317,14 @@ export class CoreStore {
  }
  private fencedRun(runId: string, token: number): Run { const run = this.run(runId);if (run.fencingToken !== token) throw new Error('STALE_FENCING_TOKEN');return run; }
  private exit(run: Run, evidence: ExitEvidence): Run {
+  if(this.executionBinding(run.id))throw new Error('TRUSTED_NODE_OBSERVATION_REQUIRED');
   validateExitEvidence(evidence);
+  return this.completeExit(run,evidence,evidence.kind==='process-exit' && evidence.exitCode!==0);
+ }
+ private completeExit(run:Run,evidence:unknown,failed:boolean):Run {
   if (!run.slotHeld) return run;
   this.database.prepare("UPDATE run SET state='EXITED',slot_held=0,exit_evidence=?,version=version+1 WHERE id=?").run(canonicalJson(evidence),run.id);
-  const status = run.stopKind === 'cancel' ? 'CANCELLED' : run.stopKind === 'interrupt' ? 'WAITING_INPUT' : evidence.kind === 'process-exit' && evidence.exitCode !== 0 ? 'FAILED' : 'VERIFYING';
+  const status = run.stopKind === 'cancel' ? 'CANCELLED' : run.stopKind === 'interrupt' ? 'WAITING_INPUT' : failed ? 'FAILED' : 'VERIFYING';
   this.database.prepare('UPDATE task SET status=? WHERE id=?').run(status,run.taskId);
   this.database.prepare("UPDATE bot_inbox SET state='DONE' WHERE task_id=?").run(run.taskId);
   this.event('run.exited',{runId:run.id,evidence,taskStatus:status});return this.run(run.id);
@@ -212,6 +332,7 @@ export class CoreStore {
  reconcile(runId: string, observation: {kind: 'alive' | 'unreachable' | 'exited'; fencingToken: number; evidence?: ExitEvidence}): Run {
   return this.write(() => {
    const run = this.fencedRun(runId,observation.fencingToken);
+   if(this.executionBinding(runId) && observation.kind==='alive')throw new Error('TRUSTED_NODE_OBSERVATION_REQUIRED');
    if (observation.kind === 'exited') { if (!observation.evidence) throw new Error('EXIT_EVIDENCE_REQUIRED');return this.exit(run,observation.evidence); }
    if (!run.slotHeld) return run;
    const state = observation.kind === 'unreachable' ? 'LOST' : run.stopKind === 'cancel' ? 'CANCEL_REQUESTED' : run.stopKind === 'interrupt' ? 'INTERRUPT_REQUESTED' : 'RUNNING';

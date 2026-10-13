@@ -1,6 +1,6 @@
 export const coreSchema = `
 CREATE TABLE IF NOT EXISTS core_metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-INSERT OR IGNORE INTO core_metadata VALUES ('schema_version',1),('epoch',0),('fencing_token',0);
+INSERT OR IGNORE INTO core_metadata VALUES ('schema_version',2),('epoch',0),('fencing_token',0);
 CREATE TABLE IF NOT EXISTS bot (
  id TEXT PRIMARY KEY, name TEXT NOT NULL, owner TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
  accepting_tasks INTEGER NOT NULL DEFAULT 1 CHECK(accepting_tasks IN (0,1)),
@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS run (
  slot_held INTEGER NOT NULL CHECK(slot_held IN (0,1)), version INTEGER NOT NULL DEFAULT 1,
  last_sequence INTEGER NOT NULL DEFAULT 0, stop_kind TEXT CHECK(stop_kind IN ('cancel','interrupt')),
  exit_evidence TEXT, context_manifest_ref TEXT NOT NULL, resolved_connection_ref TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS run_execution_binding (
+ run_id TEXT PRIMARY KEY REFERENCES run(id), protocol_version INTEGER NOT NULL CHECK(protocol_version=2),
+ binding TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS one_bot_writer ON run(bot_id) WHERE slot_held=1;
 CREATE TABLE IF NOT EXISTS outbox_event (

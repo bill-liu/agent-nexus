@@ -6,9 +6,9 @@ export function migrateCore(db: DatabaseSync): void {
   const existing = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='core_metadata'").get();
   if (existing) {
     const version = db.prepare("SELECT value FROM core_metadata WHERE key='schema_version'").get()?.value;
-    if (version !== 1) throw new Error('UNSUPPORTED_CORE_SCHEMA');
+    if (version !== 1 && version !== 2) throw new Error('UNSUPPORTED_CORE_SCHEMA');
   }
   db.exec('BEGIN IMMEDIATE');
-  try { db.exec(coreSchema); db.exec('COMMIT'); }
+  try { db.exec(coreSchema); db.exec("UPDATE core_metadata SET value=2 WHERE key='schema_version'"); db.exec('COMMIT'); }
   catch (error) { db.exec('ROLLBACK'); throw error; }
 }

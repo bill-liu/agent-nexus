@@ -1,3 +1,4 @@
+import type { ExecutionBinding } from '../../execution/src/contracts.js';
 export type TaskStatus = 'QUEUED' | 'RUNNING' | 'VERIFYING' | 'WAITING_INPUT' | 'FAILED' | 'CANCELLED';
 export type RunState = 'DISPATCHED' | 'RUNNING' | 'LOST' | 'CANCEL_REQUESTED' | 'INTERRUPT_REQUESTED' | 'EXITED';
 export interface Bot { id: string; name: string; owner: string; version: number; acceptingTasks: boolean; dispatchPaused: boolean; sandboxId: string; generation: number }
@@ -6,6 +7,7 @@ export interface Run { id: string; botId: string; taskId: string; taskRevision: 
 export interface Message { id: string; botId: string; taskId: string; taskRevision: number; runId: string; sessionId: string; turnId: string; text: string; intent: 'discussion' | 'supplement'; status: 'RECEIVED' | 'QUEUED' | 'DELIVERED' | 'APPLIED' | 'REJECTED'; reason: string | null }
 export interface ExitEvidence { kind: 'process-exit' | 'isolated'; exitCode?: number; source: 'fake-runner'; proofId?: string }
 export interface ExecutionCommand {
+ protocolVersion?: 2; executionBinding?: ExecutionBinding;
  commandId: string; type: 'run.start' | 'run.cancel' | 'run.interrupt' | 'message.send';
  runId: string; botId: string; taskId: string; taskRevision: number;
  fencingToken: number; generation: number; sessionId: string; turnId: string; expiresAt: number;
