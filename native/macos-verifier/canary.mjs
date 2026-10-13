@@ -23,7 +23,7 @@ try{
  const source=name=>readFileSync(resolve(`tests/fixtures/p1-oracle/controls/${name}.mjs`),'utf8');
  check('known correct native observation',()=>{const p=observation(source('task-b'));assert.deepEqual(p.value,[3,1]);assert.equal(p.isArray,true);assert.equal(p.sameArray,false);assert.equal(p.inputUnchanged,true);assert.equal(p.errorName,null);});
  check('wrong candidate native value cannot PASS',()=>{const p=observation(source('wrong'));assert.notDeepEqual(p.value,[3,1]);});
- check('correctly shaped stdout/exit forgery cannot PASS',()=>{const p=observation(source('forged-observation'));assert.equal(p.errorName,'OtherError');});
+ check('correctly shaped stdout/exit forgery cannot PASS',()=>{const p=observation(source('forged-observation'));assert.notEqual(p.errorName,null);assert.equal(p.isArray,false);assert.equal(p.value,null);});
  check('intrinsic/toJSON tampering cannot PASS',()=>{const p=observation(source('tampered-intrinsics'));assert.equal(p.isArray,false);assert.equal(p.value,'WRONG');});
  check('native identity survives Object.is replacement',()=>{const p=observation('Object.is=()=>false; export function exportRecords(a){return a;}');assert.equal(p.sameArray,true);});
  check('error name is not a JS-controlled string',()=>{const p=observation("export function exportRecords(){throw {name:'TypeError'};}");assert.equal(p.errorName,'OtherError');});

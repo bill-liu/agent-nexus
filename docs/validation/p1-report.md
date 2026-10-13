@@ -83,3 +83,9 @@ Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/ag
 - [人工 Mac 清单](p0-manual-mac-checklist.md) 均 NOT_RUN；自动化不能代填 IME/VoiceOver/多屏/睡眠结果。P0 记录未改写。
 
 本候选交付 P1-A 实现与无账号验证材料，尚待该 SHA 的完整 Mac CI。已知未支持路径、未完成独立复审及所有 B/live/人工缺口保留；**不宣称 P1 完成**。
+
+## 集成候选 CI 收尾
+
+集成提交 [`646ff19`](https://github.com/bill-liu/agent-nexus/commit/646ff19a4b9dee7ebf7c9155c0ebc07feb77b3ea) 已非强推进入 main。其 [桌面 CI](https://github.com/bill-liu/agent-nexus/actions/runs/38344480035) Linux 524/524 SUCCESS；Mac 517 通过 / 7 失败，尚未打包。失败位于两个新 fixture 文件，临时根同样含 `/var` alias；仅规范化新建测试根，不改生产 catalog/snapshot 安全规则。
+
+同 SHA 的 [原生 canary](https://github.com/bill-liu/agent-nexus/actions/runs/38344480047) 通过前两个对照，stdout 伪造负例因 `process` 被封闭为 undefined 而抛 TypeError（原断言写死 OtherError）。修正断言只要求实际异常、非数组和 null 结果；错误候选仍不能通过后续完整 supervisor，宿主桥缺失与其余 15 对照保留。该错误不是报告伪造成功。helper 和工具链 CI 同 SHA SUCCESS。等待收尾提交全套 CI，不将未通过项标为完成。

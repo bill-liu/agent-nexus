@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { generateKeyPairSync, sign } from 'node:crypto';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync,realpathSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DownloadManager, canonicalManifest, hashBytes, type SignedManifest } from '../../packages/catalog-client/src';
 const cleanups:(()=>void)[]=[];
 afterEach(()=>{for(const cleanup of cleanups.splice(0))cleanup();});
 function fixture(approved=true) {
- const db=new DatabaseSync(':memory:');const directory=mkdtempSync(join(tmpdir(),'an-raw-test-'));
+ const db=new DatabaseSync(':memory:');const directory=realpathSync(mkdtempSync(join(tmpdir(),'an-raw-test-')));
  cleanups.push(()=>{db.close();rmSync(directory,{recursive:true,force:true});});
  const bytes=Buffer.from('small inert raw bootstrap test bytes');
  const {privateKey,publicKey}=generateKeyPairSync('ed25519');

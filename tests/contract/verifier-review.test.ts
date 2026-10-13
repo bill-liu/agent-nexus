@@ -1,11 +1,11 @@
 import {afterEach,expect,test} from 'vitest';
-import {mkdtempSync,rmSync,writeFileSync,readFileSync} from 'node:fs';
+import {mkdtempSync,realpathSync,rmSync,writeFileSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setup} from '../fixtures/p1-oracle/harness.js';
 const dirs:string[]=[];
 afterEach(()=>dirs.splice(0).forEach(d=>rmSync(d,{recursive:true,force:true})));
-function fixture(){const d=mkdtempSync(join(tmpdir(),'an-review-'));dirs.push(d);return setup(d,'task-b','B');}
+function fixture(){const d=realpathSync(mkdtempSync(join(tmpdir(),'an-review-')));dirs.push(d);return setup(d,'task-b','B');}
 for(const file of ['test/export-records.test.mjs','CHANGELOG.md'])test(`required_deliverable_missing_${file}`,async()=>{
  const h=fixture();rmSync(join(h.workspace,file));const s=h.store.capture(h.workspace);
  const r=await h.worker.verifyCandidate({...h.input,candidateDigest:s.digest,immutableSnapshotRef:s.ref});
