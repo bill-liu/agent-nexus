@@ -66,6 +66,10 @@ N1/N2 的无账号工作可按既有批准继续。当前优先获得单一路�
 - [ ] 发现问题先新增可失败的回归，观察失败，再最小修复并重跑受影响集合；没有发现新问题也只写实际覆盖的范围，不宣称通用安全。
 - [ ] 以一个固定候选提交代码/复审结果，更新 P1 报告引用。Critical/Important 未解决项阻塞对应 live 路径，不阻止无关文档或普通逻辑工作。
 
+### N1 本轮收尾回执（追加，不改历史快照）
+
+代码候选 `43b7e644e30e387b3c608d9ce29b4956db4d8cb5` 已取得536逻辑/11Electron/9Mac、15原生固定对照、7helper和smoke同SHA CI成功。A2/A3/A5按GPT6.1-SOL high串行独立收尾，具体覆盖、失败历史与有限闭环见 [关键复审记录](../validation/p1-critical-review.md) 和 [P1报告](../validation/p1-report.md)。N1审查收尾不解除same-boot恢复、硬RAM、实际隔离/网络/具名授权门禁；N2及B尚未启动。最小脱敏授权资料集中在记录末尾的表，不因填表推定强制能力已满足。
+
 ## 4. N2 — 把首次安装从说明拼成可复现路径
 
 **复用文件：** [BOOTSTRAP.md](../../native/macos-sandbox-host/BOOTSTRAP.md)、`scripts/mac-vm-preflight.mjs`、`scripts/prepare-vm-disk.mjs`、`scripts/start-guest-node.mjs`、`apps/node-agent/src/enforcement-gate.mjs`、`apps/node-agent/src/vsock-bridge.py`。

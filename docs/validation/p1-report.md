@@ -125,3 +125,20 @@ Mac native 第三个候选 `4a06f58` 的 [canary](https://github.com/bill-liu/ag
 随后独立 A3 审查完整现有 30 文件及必要接线，原 helper #2/#3 保持源码关闭；#1 same-boot UNKNOWN 仍是明示 B3 阻塞。实证发现磁盘准备的过期/畸形授权仍可产生后续副作用，并在首补丁发现 timeout:0 残留。均建立 RED→GREEN 后最小修复；最终补丁由同一独立审查者复验关闭（9 回归、12 额外边界）。本提交根 Linux 44 文件/536 项、typecheck/build/语法/diff 通过；该提交自己的 Mac CI 另行核对，不冒用 e4d 包摘要。
 
 详细范围、失败历史和来源分别见 [关键复审记录](p1-critical-review.md)。A5 独立复审下一步串行进行；N2 首装、P1-B/live、人工 Mac 和已声明未实现能力维持原状态，**P1 未完成**。
+
+## N1 固定代码候选与独立收尾回执
+
+代码候选 [`43b7e644e30e387b3c608d9ce29b4956db4d8cb5`](https://github.com/bill-liu/agent-nexus/commit/43b7e644e30e387b3c608d9ce29b4956db4d8cb5) 四组标准 CI 全部 SUCCESS：
+
+| 同 SHA 检查 | 实际结果 |
+|---|---|
+| [桌面 38349497078](https://github.com/bill-liu/agent-nexus/actions/runs/38349497078) | Linux/Mac 各 44 文件/536 项；typecheck/build/package通过；实际包 Electron11/11、Mac9/9；macOS15.7.9arm64、Electron44.7.0、dirty:false |
+| [原生 38349497052](https://github.com/bill-liu/agent-nexus/actions/runs/38349497052) | 15/15 固定合成对照；A5审查者独立直接核对同提交日志 |
+| [helper 38349497037](https://github.com/bill-liu/agent-nexus/actions/runs/38349497037) | Swift编译、7项策略测试和只读preflight；未启动VM |
+| [smoke 38349497055](https://github.com/bill-liu/agent-nexus/actions/runs/38349497055) | 临时SDK工具链检查成功，不是应用/VM live门禁 |
+
+该实际测试包 app.asar SHA256 `51c5426ed36005a61e7e5c54b19a3ef29107722e812e6716d2667209bec637ee`；产物 ID `11790426100`，zip SHA256 `82c4abb328a555c99fbf3f33de2df59f9dec4b9dac736d50bd68b820bc633943`，有效至 `2026-10-20T05:04:42Z`。本段绑定该代码提交；本次后续仅复审/表格文档，仍须读取其 own SHA CI 和包摘要。
+
+GPT6.1-SOL high 串行独立 A2、A3、A5 收尾完成；范围、实证失败/补丁复验、根自验和独立证据分别记于 [关键复审记录](p1-critical-review.md)。A5原stdout问题在固定原生边界关闭，原必需文件问题在v2结构范围关闭；现有5files44/44与同SHA原生15/15为独立证据。首轮内容安全中断后仅完成收窄只读检查，不宣称任意不可信JS通用安全。CHANGELOG保证收窄为UTF-8解码文本prefix，硬RAM仍未证明。
+
+A3同启动崩溃恢复仍UNKNOWN/B3阻塞，guest自主关机后的machine退休需获准Mac实测。N2、B/live和人工Mac未执行；任意模型候选仍受资源/隔离/具名授权门禁阻塞。脱敏填写项集中在 [最小具名B表](p1-critical-review.md#后续-b-的最小具名授权表)，不会收集公开秘密或自动启动设备操作。**P1整体未完成。**

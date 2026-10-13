@@ -41,10 +41,56 @@
 
 无确认未关闭的新 Critical/Important。另一个 **未证实平台条件** 保留：guest 自主关机后，helper inspect 的 stopped 与其 machine/持久 running 记录退休是否一致。须在获准 ARM64 Mac 用合成 guest 实测自主关机→inspect→确切代际 stop→再 start；不能仅凭 Linux 源码判断通过或默默放行 UNKNOWN。vsock、真实 cgroup/BPF 正负例、子进程停写和完整恢复仍 NOT_RUN。
 
-## A5
+## A5：原生固定验证边界与结构验收
 
-原生 Critical 修复的独立复审尚待串行完成。固定原生 canary 不冒充完整独立闭环。
+独立审查绑定干净 `43b7e644e30e387b3c608d9ce29b4956db4d8cb5`；原 Critical（stdout 冒充观察）在当前固定原生路径 **CLOSED**，原 Important（缺 tests/CHANGELOG 仍接受）在 v2 结构验收范围 **CLOSED**。没有新增已执行复现的 Critical/Important；这份结论不覆盖任意不可信 JavaScript 的通用安全，也不解除 B 门禁。
+
+旧 `IsolatedVerifierExecutor`、`NodeVerificationService` 和 probe 前置 fail-closed，不再启动旧候选观察路径。新 Node/esbuild 只转换文本；JSC 没有注册 JS→native callbacks/classes，宿主入口求值前删除并封闭。实际函数返回、数组、引用 identity、错误 prototype、captured freeze 由 native C API 观察，Foundation 生成报告。候选自写 JSON/toJSON 不负责可信输出。当前 Main/Core 绑定、helper pin、immutable manifest、Core epoch/current candidate 与 WeakMap issuer/reportDigest 接线经源码及现有测试核对。
+
+| 独立证据 | 实际结果 |
+|---|---|
+| Linux Node 24.19.0 现有 5 文件 | macos-evidence、isolated-evidence、verifier-review、evidence contract + evidence integration：44/44、exit 0；包含旧服务零效应、缺所需文件/B unchanged tests/替换 CHANGELOG/缺 A binding、raw report/改报告拒绝、immutable SQLite 与 A→B |
+| 同 SHA [原生 run38349497052/job115138396119](https://github.com/bill-liu/agent-nexus/actions/runs/38349497052/job/115138396119) | 审查者直接读取作业与日志，macOS15.7.9 arm64；15/15 既有固定原生/实际 supervisor 对照通过，不是根转述或 Linux 静态断言 |
+
+独立日志 SHA256：测试 `236726fd61b309a39e71ef03ae025260cc8f027a611d4536743351bf247fb72b`、Mac 原生日志 `e9fbd64680590a1c724aff8905fd860917d61f91e89f63c99fd95d257bddc140`。native source `c2099fa3ff737c0942791d1d6446ffd4342ad98924301ca396e8128d12187e5b`、canary `1dd3b5483457adb6a54edc0260ea74c3b43bc45aeeb09253480be59d45158c4a`。原报告与实际日志保留在工作区 `an-p1-work/reviews/a5-closure`。
+
+精确范围与未证明部分：
+
+- B 所需测试检查是内容变化/非空结构，不证明有意义覆盖、语法或项目测试已经执行；运行行为交由固定独立 oracle。
+- CHANGELOG 以 UTF-8 **解码文本**比较 A 前缀与非空追加；没有直接 Buffer 字节比较，也未显式拒绝无效 UTF-8。不宣称任意字节 exact prefix；此边界未执行新增独立负例，不能作为已证实新缺陷。pre-B authenticated workspace 整体 SHA256 等于 accepted A 的输入 custody 是另一项已有检查。
+- pure-computation sandbox、实际 file/socket 拒绝、CPU2秒、parent5秒和64KiB总输出有现有源码/固定控制证据；**硬物理内存上限未证明**，时间/快照上限不替代硬 RAM。
+- 本地 Linux native 编译 NOT_RUN；完整 installed guest + native verifier + Core 的真实 Task A/B、资源/网络/子写者实际门禁均 NOT_RUN/BLOCKED。当前只可依据已发生的固定可信合成对照，任意模型候选及 B 继续 BLOCKED。
+
+首轮审查结果交付被平台 content-safety 标记中断；最终完成的是收窄后的源码/现有测试/同 SHA CI 只读审查，没有运行新的对抗程序或扩大平台操作。该历史不是本地工具权限拒绝，也不把未交付一轮算通过。
+
+## 闭环与待做项
+
+| 项目 | 最终状态 |
+|---|---|
+| A2 原 pressure + 新 EOF/恢复 handoff 实证缺陷 | 三项独立 CLOSED，e4d11e8 提交 |
+| A3 新过期/畸形/timeout:0 授权缺陷 | 独立 CLOSED，43b7e64 提交 |
+| A3 原 helper #2/#3 | 保持源码关闭；真实 Darwin/VM 生命周期证据仍待具名目标 |
+| A3 原 helper #1 same-boot recovery | PARTIAL / UNSUPPORTED / B3 BLOCKED；UNKNOWN 不放行新 writer |
+| A5 原 Critical / Important | 固定原生 / v2 结构范围独立 CLOSED；不是通用安全或完整 B readiness |
+| N2 / B1–B3 / 人工 Mac | 未启动 / NOT_RUN / BLOCKED，所选路径相关强制能力缺口仍保留 |
+
+根代理全套与四组标准 CI 是独立记录来源；未参与实现的审查者只对上文明确集合和控制提供独立证据，不重命名为全套/真实场景通过。后续原生资源、实际 guest 自主关机退休、无账号正向隔离和 Task A/B 必须另行满足准入与实际门禁。
 
 ## 实际环境与剩余边界
 
 用户 Mac/VM/CLI、账号/凭据、模型、实际 Task A/B 和人工 Mac 检查全部 NOT_RUN/BLOCKED。Mac mini M4、personal-codex-p1 仍 UNCONFIRMED。同主机启动内 helper 崩溃恢复、细粒度网关、每 Bot 文件配额、verifier 硬物理内存上限与受监督首装缺口维持原报告状态。此次未启动 N2、VM、登录或费用操作。
+
+## 后续 B 的最小具名授权表
+
+这张表只收集脱敏 ID 和批准引用；设备地址、账号细节、授权文件及秘密保存在获准私有配置，不写公开 Issue。当前候选均 UNCONFIRMED；没有填表或运行 B。
+
+| 必需项 | 待填写内容 |
+|---|---|
+| 目标与窗口 | validationTargetId、所有者/测试者引用、可用窗口；实际 ARM64 macOS/VM/GUI 与私有安装根/资源限额的证据引用 |
+| 分项设备操作 | 明确逐项允许：只读 preflight；准备/安装磁盘与 guest；create/start/connect/owned stop；无账号 initialize；故障/恢复；签名或清理仅另列具体范围 |
+| 固定环境 | bootstrap/runtime/helper/verifier 版本、摘要、许可/用途准入与 N2 受监督准备证据；不把通用 Ubuntu 镜像当已安装 AN guest |
+| Connection | connectionId、目的/主体与私有账号引用、认证方式、计费来源及证据；允许 node/project/Bot/模型、direct/gateway 路由与端点政策 |
+| 数据与执行边界 | 仅公开/合成 Task A/B 项目或明确批准的数据范围/传送位置；Run/并发/调用/时长/费用边界及实际可执行控制，未知项明确阻塞，不以金额字段代替硬上限 |
+| 撤销和恢复 | 批准引用、撤销入口、owned stop/保留数据/清理范围；保留 UNKNOWN 和失败历史，不能删除旧 journal 或允许替代 writer 以绕过恢复缺口 |
+
+即使具名授权齐全，当前硬内存、实际网络/隔离、same-boot 恢复等与所选路径相关的强制缺口仍按门禁 BLOCKED。下一步 N2、B1/B2/B3 分阶段处理，不能用本次复审或标准 CI 推定通过。具体既有表见 [Mac 目标准入](mac-target-preflight.md) 与 [Connection 准入](p1-connection-preflight.md)。
