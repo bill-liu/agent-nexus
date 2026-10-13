@@ -42,6 +42,10 @@
 
 旧 Node 路径必须在副作用前 BLOCKED。Linux 定向检查包括文本转换不执行候选和平台/授权缺失拒绝；Mac 编译与 canary 在本提交前 NOT_RUN。Darwin 的 `RLIMIT_AS` 不证明硬物理内存上限；本切片仅声称 CPU/时间/输出限制与语言/OS 的 IO 边界。项目测试改动检查属于结构证据，不证明测试覆盖率。Core SUCCEEDED 迁移及 A→B 验收装配留到后续集成提交。
 
+A4 修正候选 [`ee2776c`](https://github.com/bill-liu/agent-nexus/commit/ee2776c1d64a467d967cffae0ef1ae43fb11ecd1) 的 [实际 Mac 包 CI](https://github.com/bill-liu/agent-nexus/actions/runs/38329827499) SUCCESS：356 逻辑、11 Electron、7 Mac 自动化，含临时合成 safeStorage canary。`dirty: false`，`app.asar` SHA256 `b7e4447b4c97839b9410856e3b26c501f5b98c8a2fb231abb6068b01a587c6ed`。helper 和工具链 CI 同 SHA 均成功。
+
+A5 先行候选 [`7753f64`](https://github.com/bill-liu/agent-nexus/commit/7753f649d47bcf62df7ba6010eae55c209c83001) 的 [原生 canary](https://github.com/bill-liu/agent-nexus/actions/runs/38330066346) 编译通过但首个运行检查失败 `BLOCKED_RESOURCE_LIMITS`，15 个对照尚未通过。本次仅细化资源检查错误码以定位实际不支持的限制，不降低边界。相同 SHA 的 Mac 包、helper 和 smoke 均 SUCCESS，但不能替代原生检查。
+
 ## 尚未完成
 
 - A2、A3 其余 Node/Provider、A5 和 A6 正在独立工作树实现/集成；A4 的实际 Mac canary 待 CI。未宣称 P1-A 整体完成。
