@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -20,7 +20,7 @@ describe('P1 protected storage synthetic isolated store', () => {
   });
   it('encrypted persistence uses private modes and trusted scoped retrieval', async () => {
     const module = await import('../../packages/desktop-platform/src/macos-secrets.js');
-    const root = mkdtempSync(join(tmpdir(), 'an-a4-vault-'));
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'an-a4-vault-')));
     // Scripted safeStorage surrogate is synthetic evidence, not macOS OS-protection evidence.
     const safeStorage = { isEncryptionAvailable: () => true, encryptString: (s: string) => Buffer.from([...Buffer.from(s)].map(b => b ^ 0xa5)), decryptString: (b: Buffer) => Buffer.from([...b].map(v => v ^ 0xa5)).toString() };
     try {
@@ -36,7 +36,7 @@ describe('P1 protected storage synthetic isolated store', () => {
   });
   it('symlinked roots and broad permissions cannot write or read credentials', async () => {
     const { MacOSSecretVault } = await import('../../packages/desktop-platform/src/macos-secrets.js');
-    const root = mkdtempSync(join(tmpdir(), 'an-a4-path-'));
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'an-a4-path-')));
     const safeStorage = { isEncryptionAvailable: () => true, encryptString: (s: string) => Buffer.from(s), decryptString: (b: Buffer) => b.toString() };
     try {
       symlinkSync(root, join(root, 'link'));
@@ -53,7 +53,7 @@ describe('P1 protected storage synthetic isolated store', () => {
   });
   it('storage unavailable never writes plaintext, and primitive failures do not expose raw errors', async () => {
     const { MacOSSecretVault } = await import('../../packages/desktop-platform/src/macos-secrets.js');
-    const root = mkdtempSync(join(tmpdir(), 'an-a4-unavailable-'));
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'an-a4-unavailable-')));
     let available = false;
     const safeStorage = { isEncryptionAvailable: () => available, encryptString: () => { throw new Error('SYNTHETIC_A4_CANARY'); }, decryptString: () => { throw new Error('SYNTHETIC_A4_CANARY'); } };
     try {

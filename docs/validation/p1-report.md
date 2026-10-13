@@ -34,6 +34,8 @@
 
 根工作区 2026-10-13 00:21 UTC：`npm run typecheck`、`npm test`（23 文件 / 356 项）、`npm run build`、`git diff --check` 均退出 0。定向 5 文件 / 131 项通过；新增 A4 两文件共 48 项。当前候选代码见本提交。实际包中另加入临时合成 safeStorage canary，检查真实后端、0700/0600、密文、清零和撤销；Mac CI 尚待执行，系统保护不可用会明确失败，不跳过后计为通过。普通 Renderer 没有明文读取接口。
 
+候选 `970591703d95d43dab4be8a0e58a97da952a90f7` 的 [Electron CI](https://github.com/bill-liu/agent-nexus/actions/runs/38326975793) 中 Linux 356 项通过，Mac 逻辑测试 353 通过 / 3 失败；后续实际包和 canary 未运行。三个失败均为测试创建的临时根没有解析 macOS `/var` 的系统符号链接，被既有私有路径策略正确拒绝。最小修正仅对三个新建测试根应用 `realpathSync`，不改变生产路径策略或负例断言。Linux 用符号链接 TMPDIR 已先复现同样三个失败，修正后该文件 6/6 通过；typecheck 和 diff 检查通过，独立审查确认此范围。等待修正提交的 Mac 全套 CI，不以本地模拟替代。
+
 ## 尚未完成
 
 - A2、A3 其余 Node/Provider、A5 和 A6 正在独立工作树实现/集成；A4 的实际 Mac canary 待 CI。未宣称 P1-A 整体完成。
