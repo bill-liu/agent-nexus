@@ -154,11 +154,11 @@ bridge 单独 unit `After=an-node.service`/`Requires=an-node.service`，`ExecSta
 
 初次generation1需与真实helper start一致；后续冷启动增加 generation，guest target-specific config须由批准的维护更新与真实停写证明协调。不能仅改JSON代际/删除journal绕过same-boot UNKNOWN。权限范围、公有基础镜像与私有实例分开；没有完整、可信安装 manifest 时 `adoptInstalled` 必须保持 blocked。
 
-## 6. Mac 交接与尚缺的首次生命周期调用
+## 6. Mac 交接与首次生命周期调用
 
 Mac只读批准后：`node scripts/mac-vm-preflight.mjs`；`swift build/test --package-path native/macos-sandbox-host`；built helper `--preflight`。真实development签名/`com.apple.security.virtualization`、导入raw、create/start/connect是另外分项批准；不自动使用证书/关闭Gatekeeper。编译通过不能推定虚拟化可用。
 
-**当前源代码接入缺口（不是仅缺设备权限）：** `p1-installed.ts` 构造新 `VMHelperProcessTransport`，prepareInstalled/connectRun只inspect/connect；该factory的provisionRequest是 `PREINSTALLED_TARGET_REQUIRED`，没有首次create/start调用。Swift helper的in-memory VM由该helper实例持有，global writer flock不能由第二个 helper共用。手动另启动helper持有VM，再让桌面创建另一个helper不是可用接入路线。
+**N2 基点的源代码接入缺口（保留历史）：** `p1-installed.ts` 构造新 `VMHelperProcessTransport`，prepareInstalled/connectRun只inspect/connect；该factory的provisionRequest是 `PREINSTALLED_TARGET_REQUIRED`，没有首次create/start调用。Swift helper的in-memory VM由该helper实例持有，global writer flock不能由第二个 helper共用。手动另启动helper持有VM，再让桌面创建另一个helper不是可用接入路线。
 
 N3在实际启动前需补/验证**同一受信Main/Core helper transport**的受控首次create/start与后续inspect/connect，保持既有Node/provision readiness、精确generation/owned stop。不另造常驻控制平面、不取消锁、不把persisted running当liveVM。重新按用户要求判断：现有 `assertAdmitted` 固定要求 `model.request`（p1-installed.ts），`P1Application.provision`使用该权限且provisionRequest拒绝；官方授权会话另要求login。N3 **initialize-only** 没有可复用的独立桌面业务入口。只加provider.start会让初装依赖模型/登录权限或生成无使用者的API，不满足明确门禁，故不把它作为N2现有脚本的小修。
 
@@ -186,3 +186,27 @@ N3在实际启动前需补/验证**同一受信Main/Core helper transport**的�
 脚本边界新增回归先RED：转换期间出现目标被覆盖、三种监听错误仍建Runner DB；最小修复后定向与全套通过。独立一次审查另指出policy/archive相容性及journal准入顺序，已在根的一次fix pass修文档并新增journal/authority RED→GREEN，保留未执行actual install状态。磁盘harness采用合成源pin/小输出size和converter记录桩，证明控制流/真实小文件排他发布，不是大盘、qemu或超时kill证明。Node测试只读合成配置，不读用户凭据、不启动CLI。实际数量与当前SHA的四组CI最终记于[P1报告](p1-report.md)及Issue1。
 
 推进N3前一次确认：**Mac validationTargetId/owner/操作者/窗口**及**ARM64 Linux准备目标/owner/窗口**；是否分别允许①只读探针②制品下载/签名工具与公开包安装③新私有盘分配/挂载/chroot/配置及封存④development entitlement/导入/create/start/connect/owned stop⑤无账号initialize/合成隔离与停写负向；路径/设备/资源/网络/时限/清理保留范围只进私有配置。**登录/模型/费用N4未请求或授权**。缺首次helper接线、trusted package lock/signatures、真实boot/enforcement证据仍分别BLOCKED；给出设备批准不会抹去实现缺口。N2到此停止，不自动推进N3。
+
+## 9. N3-0 代码入口（无真实操作）
+
+N3-0 从 `c40a4b5` 实现 §6 的下一代码切片，复用同一 Core DB/Bot/provision 和同一个 `VMHelperProcessTransport`；没有新安装器或后台控制面。本节更新代码状态，不把历史 N2 配方、签名/BOM/磁盘/boot 的 NOT_RUN 改为 PASS。
+
+Main/Preload 的窄业务方法 `prepareEnvironment({commandId,botId,expectedVersion})` 经 frame/write/quit 校验到 Core。Core 先短事务持久化原 operation 的初始化意图、epoch/fence，再返回 `{operationId,acceptance:"RECEIVED"}`；不把受理当完成。普通启动只读显式小配置，不 hash盘/启动helper。准备界面无准入时按钮禁用；用户请求也会再次验权。模型与环境配置为互斥启动模式，环境模式无 Connection/Grant/auth capability、不派模型 Task。
+
+`AN_APP_MODE=p1-preparation` 与显式 `AN_P1_ADMISSION_FILE` 继续作为启动输入，但文件须为**独立环境准入**；不能用现有 model.request Grant 借权。如下示例已失效，不可执行：
+
+```json
+{"version":1,"purpose":"environment-initialize","targetId":"PLACEHOLDER","authorizationRef":"PLACEHOLDER","expiresAt":0,"botId":"PLACEHOLDER","nodeId":"PLACEHOLDER","sandboxId":"PLACEHOLDER","generation":1,"actions":["inspect","create-sandbox","start-sandbox","connect","initialize-runtime","stop"],"runtimeConfigPath":"/PLACEHOLDER/runtime.json","installationManifestPath":"/PLACEHOLDER/installation.json"}
+```
+
+runtime.json 沿用 §5 InstalledRuntime shape；`budget:0, requireAccount:false, requireKnownBilling:false`，不含 loginKind/verification。其现有 model/modelProvider/candidateVersion 字段仅为兼容旧 profile 的未使用元数据，不创建 Connection 或授予模型操作。helper authority 必须确切绑定 target/node/Bot/Sandbox、root 等于 Node 私有 socket 根、actions 恰为 inspect/create/start/connect/stop，无 NIC（networkMode:none）、无 bootISO/destroy/network-egress，scope/期限与准入一致。
+
+installation.json 是**获准操作者已完成 N2 后**的保护证据引用，不是脚本凭空生成或自动验签结果。恰含 version:1、targetId/botId/nodeId/sandboxId，`disk:{path,bytes,sha256}`，runtimeDigest/policyDigest、sourceRevision（40hex）、packageLockDigest/rootfsManifestDigest/guestArtifactsDigest（64hex）、signaturesRef。public BOM/实际签名验证/包锁/安装记录必须先具证据，signaturesRef 文本本身不证明密码学验证。源/guest代码须含本切片，不能沿用旧 guest-node.cjs 冒称支持专用初始化能力。只在授权按钮请求后、generation0 初始启动之前，Core 以私有 root/已存在 regular0600 disk/实际size、流式hash及读前后身份/内容稳定性核验磁盘；它不会创建空 raw 替代安装盘。现有运行实例按确切 generation/live observation 与 Node 实际 attestation 核验，不 hash 活跃可写盘。
+
+初次 helper inspect generation0 可返回明确 `absent` 才 create；created0 才 start0→1。新 helper 恢复的 UNKNOWN、错代际、陈旧/假观察、stopped≥1、未知回执均拒绝继续。已确切 running且 provision generation相等可复用，但不停止别的 VM owner。初始化后使用同一鉴权 Node channel 的专用 `initializeEnvironment`，guest 必须 actions **仅 initialize-runtime**、network:none；入口固定 Driver initialize 0.159.2。guest open前检查 `.codex`/`.config` 缺失或 root私有空目录（推荐在获准安装时建0700空目录），拒绝旧 auth/config/symlink；实际 OS attestation 校验环境、runtime/policy、namespace/resource/network，并核对 accountless 事实。不 startTurn、login、account/read 或宿主CLI。
+
+初始化 full binding在Core冻结，保存run/session/turn/process/transport/node/sandbox/generation/fence；不是新的模型 Task。每个 forward边界重验准入、epoch/owner/Bot版本。尝试发出后即使拒权/到期，也只清理这次绑定的native进程；该尝试启动的VM才作确切代际owned stop，不destroy/删盘/删Bot。停写须完整Node观察，ACK不足；owned VM stop失败也不能称成功。成功记录 environment/runner/runtime的本次验证时间和清理结果，auth:false、liveReady:false，**不是现在仍在线**。同command查询复用完成回执；已有未完成/未知intent，包括Core重开或结果丢失，禁止新command重播；没有自动冷启动≥1、自动same-boot恢复或清未知记录的功能。需要后续具名维护对账，不手改generation/删journal。
+
+本切片只有源代码、保护小文件、脚本化helper/native协议和桌面默认拒绝的合成回归；guest/VM/磁盘/签名/安装及真实隔离仍全部 NOT_RUN。进入真实 N3 仍须 §8 的具名 ARM64 Linux准备目标与 Mac、owner/操作者/窗口、分项下载/安装/盘/挂载/entitlement/create/start/connect/stop/initialize批准和实际BOM/boot/enforcement证据。N4 登录/模型/费用没有授权。
+
+N3-0独立审查后的入口边界：安装adoption在每await后校验原epoch/owner与确切record，最终短事务CAS；initializer最终事务也重验原owner，不能从新对账record接管身份。共享inspect/connect/socket/attestation每个forward边界带入原Core epoch/fence/Bot版本和保护配置复验。Swift helper observedAt为number（可能小数毫秒），按finite、非未来、≤30秒校验，不删除时间门禁。UI时间/具体cleanup字段尚未展开显示，详细原记录与报告保留。N4还缺known-stopped冷启动/guest代际更新及同owner接续代码，不能只加账号授权就直接运行。

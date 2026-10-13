@@ -1,0 +1,6 @@
+import {it,expect} from 'vitest';
+import {Duplex} from 'node:stream';
+import {NodeRunnerChannel,serveNodeChannel} from '../../apps/node-agent/src/channel';
+import {binding} from '../fixtures/codex-driver/harness';
+function pair(){let a:Duplex,b:Duplex;a=new Duplex({read(){},write(c,_e,done){b.push(c);done();}});b=new Duplex({read(){},write(c,_e,done){a.push(c);done();}});return [a,b] as const;}
+it('environment initialize requires a guest-specific accountless capability and cannot borrow driver initialize',async()=>{const [a,b]=pair(),key=Buffer.alloc(32,4),channelBinding={nodeId:binding.nodeId,sandboxId:binding.sandboxId,generation:binding.generation,transportInstanceId:binding.transportInstanceId};let opened=0;const driver={initialize:async()=>{opened++;}} as any;const endpoint=serveNodeChannel(b,key,channelBinding,{receive:async()=>{throw Error('NO_TASK');},query:async()=>null},{observeStop:async()=>null},undefined,undefined,driver);const channel=new NodeRunnerChannel(a,key,channelBinding);try{expect(typeof (channel as any).initializeEnvironment).toBe('function');await expect((channel as any).initializeEnvironment(binding)).rejects.toThrow('NODE_REQUEST_REFUSED');expect(opened).toBe(0);}finally{channel.close();endpoint();a.destroy();b.destroy();}});

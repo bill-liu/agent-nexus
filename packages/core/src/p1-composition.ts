@@ -15,12 +15,13 @@ import type {ResolveRequest} from '../../connections/src/types.js';
 import type {DownloadManager} from '../../catalog-client/src/index.js';
 import {CandidateStore} from '../../../apps/verification-worker/src/candidate.js';
 import {VerificationWorker,type VerifierOptions,type TrustedVerifierExecutor} from '../../../apps/verification-worker/src/evidence.js';
+export {createP1EnvironmentInitializer} from './p1-environment.js';
 
 export interface InstalledRunChannel {
  stream:Duplex;key:Buffer;binding:ExecutionBinding;
  /** Verified Node facts about this exact already-isolated process; never Renderer fields. */
  stopEvidenceRef?():string|undefined;
- attestRuntime?(channel:NodeRunnerChannel):Promise<void>;
+ attestRuntime?(channel:NodeRunnerChannel):Promise<void|import('../../../apps/node-agent/src/control.js').NativePolicyAttestation>;
  assertSandbox(binding:ExecutionBinding):void;
  assertRuntimeEnvironment(binding:ExecutionBinding,environment:Readonly<Record<string,string>>):void;
 }

@@ -1,6 +1,7 @@
 import {contextBridge,ipcRenderer} from 'electron';
 import type {DesktopBridge,DesktopEvent} from '../../../packages/contracts/src/events.js';
 const bridge:DesktopBridge={
+ prepareEnvironment:input=>ipcRenderer.invoke('an:environment',input),
  auth:input=>ipcRenderer.invoke('an:auth',input),
  openAuth:input=>ipcRenderer.invoke('an:auth-open',input),
  importMaterial:input=>ipcRenderer.invoke('an:material-import',input),

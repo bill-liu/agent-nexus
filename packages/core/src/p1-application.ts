@@ -1,3 +1,6 @@
+import {parseEnvironmentInput} from '../../contracts/src/events.js';
+import {readP1ProtectedJSON,readP1Admission,readP1EnvironmentAdmission,installAdmissionMetadata} from './p1-admission.js';
+import {createConfiguredP1Capabilities,createConfiguredEnvironmentInitializer} from './p1-installed.js';
 import type {AuthInput,AuthView,MaterialInput} from '../../contracts/src/events.js';
 import type {FlowTarget} from '../../connections/src/auth-flow.js';
 import {dirname,join} from 'node:path';
@@ -41,17 +44,26 @@ const blocked=():never=>{throw Error('B_ADMISSION_REQUIRED');};
 const blockedAuth:AuthInspector & {begin():void}={begin:blocked,inspectAuth:blocked};
 /** One durable Core, no FakeRuntime, fake grant, implicit Connection, or host CLI. */
 export class P1Application {
+ static fromAdmission(path:string,admissionPath=''){
+  if(!admissionPath)return new P1Application(path);
+  const raw=readP1ProtectedJSON(admissionPath) as {purpose?:unknown};
+  if(raw?.purpose==='environment-initialize'){const admission=readP1EnvironmentAdmission(admissionPath);return new P1Application(path,undefined,app=>createConfiguredEnvironmentInitializer(app,admissionPath,admission));}
+  const admission=readP1Admission(admissionPath),app=new P1Application(path,admission.runtimeConfigPath?a=>createConfiguredP1Capabilities(a,admissionPath,admission):undefined);
+  try{installAdmissionMetadata(app,admission);if(!admission.runtimeConfigPath)app.installationBlocked();return app;}catch(error){app.close();throw error;}
+ }
  readonly core:CoreStore;readonly assets:AssetRegistry;readonly bindings:AssetBindings;readonly context:ContextAssembler;
  readonly connections:ConnectionStore;readonly registry:ConnectionRegistry;readonly grants:GrantService;readonly leases:LeaseService;
  readonly resolver:ConnectionResolver;readonly approvals:ApprovalService;readonly authFlows:AuthFlowService;readonly evidence:CoreEvidenceService;readonly execution:AsyncApplication;
  private installationError:string|null=null;
  private readonly capabilities?:P1Capabilities;private closed=false;private schedulerError:string|null=null;private pumping?:Promise<void>;
- constructor(path:string,configure?:(app:P1Application)=>P1Capabilities){
+ private readonly environmentInitializer?:import('./p1-environment.js').P1EnvironmentInitializer;
+ constructor(path:string,configure?:(app:P1Application)=>P1Capabilities,configureEnvironment?:(app:P1Application)=>import('./p1-environment.js').P1EnvironmentInitializer){
+  if(configure&&configureEnvironment)throw Error('ENVIRONMENT_MODE_EXCLUSIVE');
   this.core=new CoreStore(path);
   this.assets=new AssetRegistry(this.core.database,join(dirname(path),'p1-assets'));this.bindings=new AssetBindings(this.assets);this.context=new ContextAssembler(this.assets,this.bindings);
   this.connections=new ConnectionStore(this.core.database);this.registry=new ConnectionRegistry(this.connections);this.grants=new GrantService(this.connections);this.leases=new LeaseService(this.connections);
   this.approvals=new ApprovalService(this.core.database,{trustedActor:()=> 'local-user',authorizeDecision:(actor,b)=>actor==='local-user'&&this.bot(b.botId).owner===actor,revalidate:b=>this.revalidateApproval(b)});
-  this.capabilities=configure?.(this);
+  try{this.capabilities=configure?.(this);this.environmentInitializer=configureEnvironment?.(this);}catch(error){this.core.close();throw error;}
   this.resolver=new ConnectionResolver(this.registry,this.grants,this.capabilities?.auth??blockedAuth,this.leases,this.capabilities?.secretBackend?{secretBackend:this.capabilities.secretBackend}:undefined);
   this.authFlows=new AuthFlowService(this.connections,this.registry,this.capabilities?.auth??blockedAuth,Date.now,[],this.capabilities?.nativeAuth);
   this.evidence=new CoreEvidenceService(this.core,this.capabilities?.evidenceAuthority??{assertIssued:blocked,assertArtifacts:blocked});
@@ -122,7 +134,7 @@ export class P1Application {
   this.bindings.bind(id,scope,material.version);if(input.kind==='skill')this.bindings.enableSkill(id,scope);
   return {botId:bot.id,assetId:material.assetId,version:material.version,kind:material.kind,title:material.title,digest:material.digest,policy:material.policy};
  }
- environment(botId:string){const bot=this.bot(botId);const config=this.config(botId);const record=inspectProvision(this.core.database,config.operation_id);let errorCode=record.errorCode;let auth=record.readiness.auth;if(record.liveReady&&(!record.readinessObservedAt||record.readinessObservedAt>Date.now()||record.readinessObservedAt<Date.now()-30000)){auth=false;errorCode='READINESS_STALE';}const sessions=this.connections.all<AuthInspection>('auth_sessions').filter(s=>s.botId===botId&&s.generation===bot.generation);if(sessions.some(s=>s.status==='expired'||s.expiresAt<=Date.now())){auth=false;errorCode='AUTH_EXPIRED';}if(!config.connection_id){auth=false;errorCode=errorCode??'CONNECTION_REQUIRED';}return {...record,readiness:{...record.readiness,auth},liveReady:record.liveReady&&auth,connectionId:config.connection_id,errorCode:errorCode??(!record.readiness.runner?'RUNNER_REQUIRED':!record.readiness.runtime?'RUNTIME_REQUIRED':!auth?'AUTH_REQUIRED':undefined)};}
+ environment(botId:string){const bot=this.bot(botId);const config=this.config(botId);const record=inspectProvision(this.core.database,config.operation_id);let errorCode=record.errorCode;let auth=record.readiness.auth;if(record.liveReady&&(!record.readinessObservedAt||record.readinessObservedAt>Date.now()||record.readinessObservedAt<Date.now()-30000)){auth=false;errorCode='READINESS_STALE';}const sessions=this.connections.all<AuthInspection>('auth_sessions').filter(s=>s.botId===botId&&s.generation===bot.generation);if(sessions.some(s=>s.status==='expired'||s.expiresAt<=Date.now())){auth=false;errorCode='AUTH_EXPIRED';}if(!config.connection_id){auth=false;errorCode=errorCode??'CONNECTION_REQUIRED';}return {...record,canInitialize:!record.initialization&&this.environmentInitializer?.allowsBot(botId)===true,readiness:{...record.readiness,auth},liveReady:record.liveReady&&auth,connectionId:config.connection_id,errorCode:errorCode??(!record.readiness.runner?'RUNNER_REQUIRED':!record.readiness.runtime?'RUNTIME_REQUIRED':!auth?'AUTH_REQUIRED':undefined)};}
  snapshot(){this.approvals.expire();const state=this.core.snapshot();return {...state,mode:'p1-preparation' as const,authFlows:this.connections.all<import('../../connections/src/auth-flow.js').AuthFlowMetadata>('auth_flows').map(f=>this.authFlows.status(f.id)),materials:state.bots.flatMap(bot=>this.assets.list({botId:bot.id,projectId:this.capabilities?.materialScope?.(bot.id)??`preparation:${bot.id}`}).map(b=>{const m=this.assets.version(b.assetId,b.version);return {botId:bot.id,assetId:m.assetId,version:m.version,kind:m.kind,title:m.title,digest:m.digest,policy:m.policy};})),schedulerError:this.installationError??this.schedulerError,environments:state.bots.map(b=>this.environment(b.id)),connections:this.registry.list().filter(c=>c.provider!=='fake'&&!c.runtimeProfiles.some(p=>p.startsWith('fake'))).map(c=>({id:c.id,name:c.name,authMethod:c.authMethod,billingSource:c.billingSource,billingEvidence:c.billingEvidence,route:c.route,status:c.status,revision:c.revision,fallbackPolicy:c.fallbackPolicy})),approvals:this.core.database.prepare('SELECT id FROM approval_requests').all().map(row=>this.approvals.get(String(row.id))).map(a=>({id:a.id,botId:a.binding.botId,runId:a.binding.runId,action:a.action,parameters:a.parameters,requestHash:a.requestHash,status:a.status,expiresAt:a.expiresAt})),contexts:state.runs.filter(r=>r.contextManifestRef).map(r=>this.context.get(r.contextManifestRef)),evidence:state.tasks.map(t=>({taskId:t.id,...this.evidence.inspect(t.id)}))};}
  pump():Promise<void>{if(this.pumping)return this.pumping;this.pumping=(async()=>{try{await this.execution.flush();for(const bot of this.core.snapshot().bots){if(!this.capabilities)continue;await this.execution.dispatch(bot.id);}await this.execution.flush();this.schedulerError=null;}catch(error){this.schedulerError=error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'EXECUTION_BLOCKED';}finally{this.pumping=undefined;}})();return this.pumping;}
  /** Trusted Node/coordinator entry only: no renderer method accepts stop proof, candidate, oracle or report. */
@@ -144,7 +156,18 @@ export class P1Application {
  /** Bounded trusted completion polling; renderer cannot submit evidence references. */
  async reconcile(){if(!this.capabilities?.stopEvidence)return;try{await this.capabilities.reconcilePreparations?.();}catch{this.schedulerError='PREPARATION_STOP_UNKNOWN';return;}let failed=false;for(const run of this.core.snapshot().runs.filter(r=>r.slotHeld).slice(0,8)){try{const ref=await this.capabilities.stopEvidence(run);if(ref){if(run.stopKind){await this.execution.observeStop(run.id,ref);this.capabilities.releaseRun?.(run.id);}else await this.completeRun(run.id,ref);}}catch(error){failed=true;this.schedulerError=error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'VERIFICATION_BLOCKED';}}if(!failed)await this.pump();}
  async provision(botId:string){const cap=this.capabilities;if(!cap?.provisioner||!cap.provisionRequest)throw Error('B_ADMISSION_REQUIRED');cap.assertAdmitted();const bot=this.bot(botId),config=this.config(botId);return cap.provisioner.provision(cap.provisionRequest(botId,config.operation_id,bot.sandboxId));}
- async shutdown(){for(const run of this.core.snapshot().runs.filter(r=>r.slotHeld)){this.core.requestCancel(run.id);this.approvals.cancelRun(run.id);}await this.execution.flush().catch(()=>{});const unknownRuns=this.core.snapshot().runs.filter(r=>r.slotHeld).map(r=>r.id);this.close();return {unknownRuns};}
+ /** Narrow user intent; configuration and lifecycle authority come only from trusted startup. */
+ async prepareEnvironment(input:import('../../contracts/src/events.js').EnvironmentInput,subject:string){
+  if(subject!=='local-user')throw Error('UNAUTHORIZED_SUBJECT');
+  const value=parseEnvironmentInput(input);
+  this.bot(value.botId);if(!this.environmentInitializer)throw Error('ENVIRONMENT_ADMISSION_REQUIRED');
+  return this.environmentInitializer.prepare(value);
+ }
+ beginEnvironmentPreparation(input:import('../../contracts/src/events.js').EnvironmentInput,subject:string){
+  if(subject!=='local-user')throw Error('UNAUTHORIZED_SUBJECT');const value=parseEnvironmentInput(input);this.bot(value.botId);if(!this.environmentInitializer)throw Error('ENVIRONMENT_ADMISSION_REQUIRED');
+  const accepted=this.environmentInitializer.start(value);void accepted.completion.catch(error=>{this.schedulerError=error instanceof Error&&/^[A-Z_]+$/.test(error.message)?error.message:'ENVIRONMENT_STATE_UNKNOWN';});return {operationId:accepted.operationId,acceptance:'RECEIVED' as const};
+ }
+ async shutdown(){await this.environmentInitializer?.settle();for(const run of this.core.snapshot().runs.filter(r=>r.slotHeld)){this.core.requestCancel(run.id);this.approvals.cancelRun(run.id);}await this.execution.flush().catch(()=>{});const unknownRuns=this.core.snapshot().runs.filter(r=>r.slotHeld).map(r=>r.id);for(const bot of this.core.snapshot().bots){const environment=this.environment(bot.id);if(environment.initialization&&!environment.initialization.completedAt)unknownRuns.push(`environment:${environment.operationId}`);}this.close();return {unknownRuns};}
  installationBlocked(){this.installationError='BLOCKED_CODE_INSTALLED_RUNTIME_REQUIRED';}
  close(){if(!this.closed){this.core.close();this.closed=true;}}
 }

@@ -32,12 +32,23 @@ export interface NodeAuthority {
  authorization: {targetId:string;expiresAt:number;actions:readonly ('sandbox-exec'|'accountless-probe'|'verify-candidate')[]};
 }
 function bindingKey(binding:ExecutionBinding):string {return createHash('sha256').update(canonicalManifest(binding)).digest('hex');}
-interface ProcessRecord {binding:ExecutionBinding;unit:string;evidenceRef:string;cgroup?:string;waitedExitCode?:number;nativePolicyDigest?:string}
+interface ProcessRecord {binding:ExecutionBinding;unit:string;evidenceRef:string;cgroup?:string;waitedExitCode?:number;nativePolicyDigest?:string;accountless?:true}
 export interface NativePolicyAttestation {
  protocolVersion:2;binding:ExecutionBinding;observedAt:number;evidenceRef:string;policyDigest:string;
  environment:{clean:true;privateHome:true;privateProject:true;privateCache:true;values:Readonly<Record<string,string>>};
  containment:{cgroupV2:true;resources:true;namespaces:true;network:'none'|'gateway';projectReadOnly:boolean};
  runtime:{version:'0.159.2';sha256:string};
+ accountless?:true;
+}
+/** Known Codex configuration/auth roots must start empty; no host credential discovery. */
+export function assertAccountlessHome(home:string,initial=true):void {
+ for(const name of ['.codex','.config']){
+  const path=join(home,name);let stat;
+  try{stat=lstatSync(path);}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}
+  if(!stat.isDirectory()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||(stat.mode&0o077)!==0)throw Error('ACCOUNTLESS_HOME_REQUIRED');
+  if(initial&&readdirSync(path).length)throw Error('ACCOUNTLESS_HOME_REQUIRED');
+  if(!initial)for(const file of ['auth.json','config.toml']){try{lstatSync(join(path,file));}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')continue;throw error;}throw Error('ACCOUNTLESS_HOME_REQUIRED');}
+ }
 }
 function overlaps(a:string,b:string):boolean {a=resolve(a);b=resolve(b);return a===b||a.startsWith(b+'/')||b.startsWith(a+'/');}
 /** Must run in the authorized Linux guest. No fallback execution on macOS or the host. */
@@ -128,23 +139,26 @@ export class NodeController implements TrustedNodeVerifier {
   if(hash.digest('hex')!==expected)throw new Error('TRUSTED_PROFILE_DIGEST_MISMATCH');
  }
  /** Fixed admitted Codex profile. The trusted gate execs bwrap only after reading actual OS controls. */
- async openNative(binding:ExecutionBinding,policy:SandboxPolicy) {
+ async openNative(binding:ExecutionBinding,policy:SandboxPolicy,accountless=false) {
   this.check(binding);
   if(!this.journal)throw new Error('BLOCKED_NODE_JOURNAL_REQUIRED');
   if(this.launching)throw new Error('NODE_WRITER_BUSY');this.launching=true;
   try {
    for(const prior of this.records.values()){const observation=await this.observeStop(prior.binding,prior.evidenceRef);if(!observation?.processTree.complete||observation.processTree.writableProcesses!==0)throw new Error('NODE_WRITER_BUSY');}
    if(this.records.has(binding.processInstanceId))throw new Error('PROCESS_INSTANCE_REUSED');
+   if(accountless&&policy.network!=='none')throw Error('ACCOUNTLESS_NETWORK_REQUIRED');
    const args=buildSandboxCommand(policy);
    privatePath(this.authority.rootfsRoot,policy.rootfs);
    for(const path of [policy.home,policy.project,policy.cache])privatePath(this.authority.privateRoot,path);
    const paths=[policy.home,policy.project,policy.cache].map(path=>resolve(path));
    if(paths.some((path,i)=>paths.some((other,j)=>i!==j&&(path===other||path.startsWith(other+'/')))))throw new Error('NODE_PATH_OVERLAP');
+   if(accountless)assertAccountlessHome(policy.home);
    if(this.authority.nativeRuntime?.version!=='0.159.2')throw new Error('NATIVE_PROFILE_UNSUPPORTED');
    await this.checkPinnedFile(policy.rootfs,'usr/bin/codex',this.authority.nativeRuntime.sha256);
    this.check(binding);
+   if(accountless)assertAccountlessHome(policy.home);
    const key=bindingKey(binding),unit=`an-${key}.service`,evidenceRef=`node-cgroup:${key}`;
-   const record:ProcessRecord={binding:structuredClone(binding),unit,evidenceRef,cgroup:`/sys/fs/cgroup/system.slice/${unit}`,nativePolicyDigest:bindingKey(policy as unknown as ExecutionBinding)};
+   const record:ProcessRecord={binding:structuredClone(binding),unit,evidenceRef,cgroup:`/sys/fs/cgroup/system.slice/${unit}`,nativePolicyDigest:bindingKey(policy as unknown as ExecutionBinding),...(accountless?{accountless:true as const}:{})};
    this.records.set(binding.processInstanceId,record);this.persist();
    const child=spawn('/usr/bin/systemd-run',['--quiet','--pipe','--wait','--service-type=exec',`--unit=${unit}`,
     ...[...resourceProperties(policy.limits),...this.gatewayProperties(policy)].map(x=>`--property=${x}`),'--property=TimeoutStopSec=5','--property=Environment=','--',
@@ -206,7 +220,8 @@ export class NodeController implements TrustedNodeVerifier {
   }
   this.check(binding);
   if(cgroupTreeState(readFileSync(join(group,'cgroup.events'),'utf8'))!=='running')throw new Error('NATIVE_ATTESTATION_UNAVAILABLE');
-  return {protocolVersion:2,binding:structuredClone(binding),observedAt:Date.now(),evidenceRef:record.evidenceRef,policyDigest,environment:{clean:true,privateHome:true,privateProject:true,privateCache:true,values:Object.fromEntries(environment.map(entry=>[entry.slice(0,entry.indexOf('=')),entry.slice(entry.indexOf('=')+1)]))},containment:{cgroupV2:true,resources:true,namespaces:true,network:policy.network,projectReadOnly:policy.discussion},runtime:{...this.authority.nativeRuntime}};
+  if(record.accountless){if(policy.network!=='none')throw Error('ACCOUNTLESS_NETWORK_REQUIRED');assertAccountlessHome(policy.home,false);}
+  return {...(record.accountless?{accountless:true as const}:{}),protocolVersion:2,binding:structuredClone(binding),observedAt:Date.now(),evidenceRef:record.evidenceRef,policyDigest,environment:{clean:true,privateHome:true,privateProject:true,privateCache:true,values:Object.fromEntries(environment.map(entry=>[entry.slice(0,entry.indexOf('=')),entry.slice(entry.indexOf('=')+1)]))},containment:{cgroupV2:true,resources:true,namespaces:true,network:policy.network,projectReadOnly:policy.discussion},runtime:{...this.authority.nativeRuntime}};
  }
  /** Trusted fixed workspace export, before initialization or after whole-tree stop; no request path. */
  async captureCandidate(binding:ExecutionBinding,policy:SandboxPolicy):Promise<SnapshotTransfer & {binding:ExecutionBinding}> {

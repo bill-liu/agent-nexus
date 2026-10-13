@@ -3,6 +3,7 @@ import {dirname,isAbsolute,resolve} from 'node:path';
 import type {Connection,ConnectionGrant} from '../../connections/src/types.js';
 import {canonicalDigest} from './approvals.js';
 import type {P1Application} from './p1-application.js';
+export {readP1EnvironmentAdmission,type P1EnvironmentAdmission} from './p1-environment-admission.js';
 export interface P1Admission {version:1;targetId:string;expiresAt:number;actions:string[];authorizationRef:string;connection:Connection;grant:Omit<ConnectionGrant,'revision'|'revoked'>;runtimeConfigPath?:string}
 function denied(code='P1_ADMISSION_INVALID'):never{throw Error(code);}
 function object(value:unknown,required:string[],optional:string[]=[]):asserts value is Record<string,unknown>{if(!value||typeof value!=='object'||Array.isArray(value)||required.some(k=>!Object.hasOwn(value,k))||Object.keys(value).some(k=>!required.includes(k)&&!optional.includes(k)))denied();}

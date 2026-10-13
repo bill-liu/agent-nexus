@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { canonicalManifest, hashBytes, type DownloadManager, type SignedManifest } from '../../catalog-client/src';
 import type { SandboxProvider, SandboxObservation, SandboxRef, EvidenceKind } from '../../contracts/src/sandbox';
+import {transaction} from '../../persistence/src/unit-of-work.js';
 
 /** Root migration owner installs this table on the existing Core DB. No second database. */
 export { BOT_PROVISION_SCHEMA } from '../../persistence/src/p1-schema.js';
@@ -8,6 +9,7 @@ export interface ProvisionRequest {operationId:string;botId:string;sandboxId:str
 export interface ProvisionRecord {
  operationId:string;botId:string;sandboxId:string;generation:number;stage:'registered'|'creating'|'downloading'|'environment-ready'|'blocked'|'ready';
  downloadOperationId?:string;readinessObservedAt?:number;readiness:{environment:boolean;runner:boolean;runtime:boolean;auth:boolean};liveReady:boolean;evidenceKind:EvidenceKind;errorCode?:string;
+ initialization?:{commandId:string;requestDigest:string;ownerEpoch:number;fencingToken:number;expectedVersion:number;binding?:import('../../execution/src/contracts.js').ExecutionBinding;completedAt?:number;cleanup?:{native:boolean;vm:boolean}};
 }
 export interface ReadinessObservation {
  sandboxId:string;generation:number;environment:boolean;runner:boolean;runtime:boolean;auth:boolean;evidenceKind:EvidenceKind;protocolVersion:2;observedAt:number;
@@ -30,12 +32,13 @@ export function registerProvision(db:DatabaseSync,input:ProvisionRegistration):P
 /** This service and its observation callback belong to trusted Core composition, never renderer input. */
 export class BotProvisioner {
  private readonly pending=new Map<string,Promise<ProvisionRecord>>();
- constructor(private readonly db:DatabaseSync,private readonly provider:SandboxProvider,private readonly downloads:DownloadManager) {}
+ constructor(private readonly db:DatabaseSync,private readonly provider:SandboxProvider,private readonly downloads?:DownloadManager) {}
  inspect(operationId:string):ProvisionRecord {
   return inspectProvision(this.db,operationId);
  }
  private save(record:ProvisionRecord):ProvisionRecord {this.db.prepare('UPDATE bot_provision SET record=? WHERE operation_id=?').run(JSON.stringify(record),record.operationId);return structuredClone(record);}
  provision(request:ProvisionRequest):Promise<ProvisionRecord> {
+  if(!this.downloads)return Promise.reject(new Error('DOWNLOAD_MANAGER_REQUIRED'));
   const digest=hashBytes(canonicalManifest(request));
   const existing=this.db.prepare('SELECT operation_id,request_digest FROM bot_provision WHERE operation_id=? OR bot_id=?').get(request.operationId,request.botId);
   if(existing && existing.operation_id===request.operationId && this.inspect(request.operationId).stage==='registered') {
@@ -63,27 +66,31 @@ export class BotProvisioner {
     const observed=await this.provider.create({operationId:request.operationId,botId:request.botId,sandboxId:request.sandboxId});
     if(observed.sandboxId!==request.sandboxId || !['created','stopped'].includes(observed.state)) throw new Error('PROVISION_SANDBOX_MISMATCH');
     record.generation=observed.generation;record.evidenceKind=observed.evidenceKind;
-    record.downloadOperationId=this.downloads.start({commandId:`${request.operationId}:download`,idempotencyKey:request.operationId,botId:request.botId,envelope:request.envelope}).operationId;
+    record.downloadOperationId=this.downloads!.start({commandId:`${request.operationId}:download`,idempotencyKey:request.operationId,botId:request.botId,envelope:request.envelope}).operationId;
     record.stage='downloading';this.save(record);
    }
-   const status=await this.downloads.resume(record.downloadOperationId!);
+   const status=await this.downloads!.resume(record.downloadOperationId!);
    if(status.state!=='ready') throw new Error('PROVISION_DOWNLOAD_INCOMPLETE');
    record.readiness.environment=true;record.stage='environment-ready';delete record.errorCode;return this.save(record);
   } catch(error) {record.stage='blocked';record.liveReady=false;record.errorCode='PROVISION_BLOCKED';this.save(record);throw error;}
  }
  /** Attach an already installed environment only after live helper reconciliation and trusted installed-file/Node validation. */
- adoptInstalled(operationId:string,ref:SandboxRef,verifyInstalled:(observation:SandboxObservation)=>Promise<void>):Promise<ProvisionRecord> {
+ adoptInstalled(operationId:string,ref:SandboxRef,verifyInstalled:(observation:SandboxObservation)=>Promise<void>,assertCurrent?:()=>void):Promise<ProvisionRecord> {
   if(this.pending.has(operationId))return Promise.reject(new Error('PROVISION_BUSY'));
   const work=(async()=>{
    const record=this.inspect(operationId);
    if(ref.sandboxId!==record.sandboxId||!Number.isSafeInteger(ref.generation)||ref.generation<record.generation||ref.generation<1)throw new Error('STALE_SANDBOX');
-   record.liveReady=false;record.readiness={environment:false,runner:false,runtime:false,auth:false};delete record.readinessObservedAt;record.stage='blocked';record.errorCode='INSTALLED_VALIDATION_REQUIRED';this.save(record);
+   // A standalone scripted fixture has no Core metadata; production always has an epoch.
+   const epoch=()=>this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='core_metadata'").get()?Number(this.db.prepare("SELECT value FROM core_metadata WHERE key='epoch'").get()?.value):null;
+   let ownerEpoch:number|null=null,expected='';const original=JSON.stringify(record);
+   transaction(this.db,()=>{assertCurrent?.();ownerEpoch=epoch();if(JSON.stringify(this.inspect(operationId))!==original)throw Error('STALE_PROVISION_OPERATION');record.liveReady=false;record.readiness={environment:false,runner:false,runtime:false,auth:false};delete record.readinessObservedAt;record.stage='blocked';record.errorCode='INSTALLED_VALIDATION_REQUIRED';this.save(record);expected=JSON.stringify(record);});
+   const current=()=>{if(epoch()!==ownerEpoch)throw Error('STALE_CORE_EPOCH');assertCurrent?.();if(JSON.stringify(this.inspect(operationId))!==expected)throw Error('STALE_PROVISION_OPERATION');};
    const validate=(observation:SandboxObservation)=>{if(observation.protocolVersion!==1||observation.sandboxId!==record.sandboxId||observation.evidenceKind!=='live'||observation.state!=='running'||!Number.isSafeInteger(observation.generation)||observation.generation<record.generation||observation.generation<1||!Number.isFinite(observation.observedAt)||Math.abs(Date.now()-observation.observedAt)>30000)throw new Error('INSTALLED_SANDBOX_UNCONFIRMED');};
-   const before=await this.provider.inspect(ref);validate(before);if(before.generation!==ref.generation)throw new Error('STALE_SANDBOX');
+   current();const before=await this.provider.inspect(ref);current();validate(before);if(before.generation!==ref.generation)throw new Error('STALE_SANDBOX');
    await verifyInstalled(structuredClone(before));
-   const after=await this.provider.inspect({sandboxId:record.sandboxId,generation:before.generation});validate(after);
+   current();const after=await this.provider.inspect({sandboxId:record.sandboxId,generation:before.generation});current();validate(after);
    if(after.generation!==before.generation)throw new Error('STALE_SANDBOX');
-   record.generation=after.generation;record.evidenceKind='live';record.readiness.environment=true;record.stage='environment-ready';delete record.errorCode;return this.save(record);
+   return transaction(this.db,()=>{current();record.generation=after.generation;record.evidenceKind='live';record.readiness.environment=true;record.stage='environment-ready';delete record.errorCode;const updated=this.db.prepare('UPDATE bot_provision SET record=? WHERE operation_id=? AND record=?').run(JSON.stringify(record),operationId,expected);if(updated.changes!==1)throw Error('STALE_PROVISION_OPERATION');return structuredClone(record);});
   })().finally(()=>this.pending.delete(operationId));this.pending.set(operationId,work);return work;
  }
  observeReadiness(operationId:string,observation:ReadinessObservation):ProvisionRecord {

@@ -98,6 +98,10 @@ N1/N2 的无账号工作可按既有批准继续。当前优先获得单一路�
 - [ ] 检查 kernel/systemd/bwrap/cgroup/BPF 和当前 attestation 的实际字段。缺能力输出准确原因，禁止关闭隔离或改用宿主 CLI。
 - [ ] 保存同一候选的日志、退出码、目标配置摘要和 readiness。得到无账号正向证据后才推进 N4；auth 仍保持未就绪，不能以初始化成功代替登录。
 
+### N3-0 无账号代码切片回执
+
+用户在阅读 N2 的 §6 建议后明确要求继续 Issue1 计划。本次从 c40a4b5 实现独立环境准入与 Main/Core 窄 prepare/initialize：复用唯一helper/原Bot-provision/fence/epoch、0→1与确切running复用、固定guest initialize-only/none网络、完整binding和owned cleanup；UNKNOWN不重播，auth仍false。范围见 [N3-0切片计划](p1-environment-initialize-plan.md)、[runbook当前入口](../validation/p1-bootstrap-runbook.md#9-n3-0-代码入口无真实操作) 与报告。真实N3的设备/签名/安装/boot/隔离门禁仍待具名批准及实际证据，不能把代码回执勾为B1通过；N4/N5未启动。
+
 ## 6. N4 — 只接一条明确授权的真实 Connection
 
 **前置：** [Connection 准入](../validation/p1-connection-preflight.md) 已确定账号用途、计费来源、节点/项目、模型、route、资料流向和可执行限制。候选 `personal-codex-p1` 不自动成为有效连接；不向用户索要公开粘贴 Key/Token。

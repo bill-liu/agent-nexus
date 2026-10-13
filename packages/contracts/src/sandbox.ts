@@ -2,7 +2,7 @@
 export interface SandboxRef { sandboxId: string; generation: number }
 export type EvidenceKind = 'scripted' | 'live';
 export interface SandboxObservation extends SandboxRef {
- protocolVersion: 1; state: 'created' | 'running' | 'stopped' | 'unknown' | 'destroyed';
+ protocolVersion: 1; state: 'absent' | 'created' | 'running' | 'stopped' | 'unknown' | 'destroyed';
  evidenceKind: EvidenceKind; observedAt: number;
 }
 export interface SandboxChannel extends SandboxRef { protocolVersion: 1; nodeId: string; channelRef: string; evidenceKind: EvidenceKind }

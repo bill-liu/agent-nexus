@@ -15,6 +15,7 @@ import {CandidateStore} from '../../../apps/verification-worker/src/candidate.js
 import {MacProtectedVerifierExecutor} from '../../../apps/verification-worker/src/macos-executor.js';
 import type {NativePolicyAttestation} from '../../../apps/node-agent/src/control.js';
 import {DownloadManager} from '../../catalog-client/src/index.js';
+export {createConfiguredEnvironmentInitializer} from './p1-environment-installed.js';
 /** Explicit, preinstalled and separately admitted target. These are private paths, never renderer fields. */
 export interface InstalledRuntime {
  version:1;targetId:string;expiresAt:number;botId:string;nodeId:string;sandboxId:string;generation:number;
@@ -45,16 +46,7 @@ export function installedConfiguration(app:P1Application,admissionPath:string,ad
  const helper=new VMHelperProcessTransport(config.helper),provider=new MacOSVMProvider(helper);
  const downloads=new DownloadManager({db:app.core.database,directory:join(dirname(admissionPath),'downloads'),trustedKeys:new Map(),target:{os:'linux',arch:'arm64',provider:'macos-vm',nodeId:config.nodeId,appProtocol:1,runnerProtocol:2},source:{authorize:async()=>{throw Error('CATALOG_SOURCE_ADMISSION_REQUIRED');},read:async()=>{throw Error('CATALOG_SOURCE_ADMISSION_REQUIRED');}}});
  const result:P1InstalledConfiguration={prepareInstalled:true,assertAdmitted:()=>assertAction('model.request'),vmHelper:helper,downloads,provisionRequest:()=>{throw Error('PREINSTALLED_TARGET_REQUIRED');},projectForBot:botId=>botId===config.botId?config.profile.projectId:`preparation:${botId}`,profile:r=>{if(r.botId!==config.botId)throw Error('B_ADMISSION_REQUIRED');return structuredClone(config.profile);},
-  async connectRun(run,sandboxId){assertAction('initialize-runtime');if(run.botId!==config.botId||sandboxId!==config.sandboxId||run.generation!==config.generation)throw Error('INSTALLED_BINDING_MISMATCH');let observed=await provider.inspect({sandboxId,generation:config.generation});if(observed.state!=='running'||observed.evidenceKind!=='live'||Math.abs(Date.now()-observed.observedAt)>30000)throw Error('SANDBOX_NOT_RUNNING');const channel=await provider.connect({sandboxId,generation:config.generation});
-   if(channel.evidenceKind!=='live'||channel.nodeId!==config.nodeId||dirname(channel.channelRef)!==config.node.privateRoot)throw Error('NODE_PRIVATE_SOCKET_REQUIRED');
-   const root=lstatSync(config.node.privateRoot),socket=lstatSync(channel.channelRef);if(!root.isDirectory()||root.isSymbolicLink()||(root.mode&0o077)!==0||root.uid!==process.getuid?.()||realpathSync(config.node.privateRoot)!==config.node.privateRoot||!socket.isSocket()||socket.isSymbolicLink()||(socket.mode&0o077)!==0||socket.uid!==process.getuid?.())throw Error('NODE_PRIVATE_SOCKET_REQUIRED');
-   const secret=readP1ProtectedJSON(config.node.keyPath);exact(secret,['keyBase64']);if(typeof secret.keyBase64!=='string')throw Error('NODE_CHANNEL_AUTH_REQUIRED');const key=Buffer.from(secret.keyBase64,'base64');if(key.length!==32||key.toString('base64')!==secret.keyBase64)throw Error('NODE_CHANNEL_AUTH_REQUIRED');
-   const stream=createConnection(channel.channelRef);await new Promise<void>((resolve,reject)=>{const timeout=setTimeout(()=>{stream.destroy();reject(Error('NODE_CONNECT_TIMEOUT'));},5000);stream.once('connect',()=>{clearTimeout(timeout);resolve();});stream.once('error',()=>{clearTimeout(timeout);reject(Error('NODE_CHANNEL_UNAVAILABLE'));});});
-   const binding={nodeId:config.nodeId,sandboxId,generation:config.generation,transportInstanceId:config.node.transportInstanceId,processInstanceId:randomUUID(),runId:run.id,fencingToken:run.fencingToken,sessionId:run.sessionId,turnId:run.turnId};
-   let attestation:NativePolicyAttestation|undefined;
-   const assertFresh=()=>{assertAction('initialize-runtime');if(Date.now()-observed.observedAt>30000||observed.observedAt>Date.now()||attestation&&(Date.now()-attestation.observedAt>30000||attestation.observedAt>Date.now()))throw Error('NODE_ATTESTATION_STALE');};
-   return {stream,key,binding,stopEvidenceRef:()=>attestation?.evidenceRef,async attestRuntime(channel){observed=await provider.inspect({sandboxId,generation:binding.generation});if(observed.state!=='running'||observed.evidenceKind!=='live')throw Error('SANDBOX_NOT_RUNNING');assertAction('initialize-runtime');const actual=await channel.attestRuntime(binding);if(actual.protocolVersion!==2||canonicalDigest(actual.binding)!==canonicalDigest(binding)||actual.policyDigest!==config.node.policyDigest||actual.runtime?.version!=='0.159.2'||actual.runtime.sha256!==config.node.runtimeDigest||!actual.environment?.clean||!actual.environment.privateHome||!actual.environment.privateProject||!actual.environment.privateCache||!actual.containment?.cgroupV2||!actual.containment.resources||!actual.containment.namespaces||actual.containment.projectReadOnly||!['none','gateway'].includes(actual.containment.network)||Math.abs(Date.now()-actual.observedAt)>30000)throw Error('NODE_CONTAINMENT_ATTESTATION_REQUIRED');attestation=actual;},assertSandbox(b){assertFresh();if(canonicalDigest(b)!==canonicalDigest(binding))throw Error('STALE_EXECUTION_BINDING');},assertRuntimeEnvironment(b,environment){assertFresh();if(!attestation||canonicalDigest(b)!==canonicalDigest(binding)||canonicalDigest(environment)!==canonicalDigest((attestation.environment as unknown as {values:unknown}).values))throw Error('NODE_ENVIRONMENT_ATTESTATION_REQUIRED');}};
-  }
+  connectRun:(run,sandboxId)=>connectInstalledRun(config,provider,run,sandboxId,assertAction)
  };
  if(config.loginKind){
   const owned=new Map<string,{channel:NodeRunnerChannel;runtime?:NativeAuthFlowRuntime;runtimeBinding:import('../../execution/src/contracts.js').ExecutionBinding}>();
@@ -82,3 +74,35 @@ export function installedConfiguration(app:P1Application,admissionPath:string,ad
  return result;
 }
 export function createConfiguredP1Capabilities(app:P1Application,path:string,admission:P1Admission){return createInstalledP1Capabilities(app,installedConfiguration(app,path,admission));}
+
+/** Shared authenticated installed channel; lifecycle and model/login admission remain callers' responsibility. */
+export async function connectInstalledRun(config:InstalledRuntime,provider:MacOSVMProvider,run:Run,sandboxId:string,assertAction:(action:string)=>void):Promise<import('./p1-composition.js').InstalledRunChannel> {
+ assertAction('initialize-runtime');
+ if(run.botId!==config.botId||sandboxId!==config.sandboxId||run.generation!==config.generation)throw Error('INSTALLED_BINDING_MISMATCH');
+ const inspect=async()=>{assertAction('initialize-runtime');const actual=await provider.inspect({sandboxId,generation:config.generation});assertAction('initialize-runtime');if(actual.state!=='running'||actual.evidenceKind!=='live'||!Number.isFinite(actual.observedAt)||actual.observedAt>Date.now()||Date.now()-actual.observedAt>30000)throw Error('SANDBOX_NOT_RUNNING');return actual;};
+ let observed=await inspect();
+ assertAction('initialize-runtime');const channel=await provider.connect({sandboxId,generation:config.generation});assertAction('initialize-runtime');
+ if(channel.evidenceKind!=='live'||channel.nodeId!==config.nodeId||dirname(channel.channelRef)!==config.node.privateRoot)throw Error('NODE_PRIVATE_SOCKET_REQUIRED');
+ const root=lstatSync(config.node.privateRoot),socket=lstatSync(channel.channelRef);
+ if(!root.isDirectory()||root.isSymbolicLink()||(root.mode&0o077)!==0||root.uid!==process.getuid?.()||realpathSync(config.node.privateRoot)!==config.node.privateRoot||!socket.isSocket()||socket.isSymbolicLink()||(socket.mode&0o077)!==0||socket.uid!==process.getuid?.())throw Error('NODE_PRIVATE_SOCKET_REQUIRED');
+ const secret=readP1ProtectedJSON(config.node.keyPath);exact(secret,['keyBase64']);if(typeof secret.keyBase64!=='string')throw Error('NODE_CHANNEL_AUTH_REQUIRED');
+ const key=Buffer.from(secret.keyBase64,'base64');let stream:ReturnType<typeof createConnection>|undefined;
+ try{
+  if(key.length!==32||key.toString('base64')!==secret.keyBase64)throw Error('NODE_CHANNEL_AUTH_REQUIRED');
+  assertAction('initialize-runtime');stream=createConnection(channel.channelRef);
+  await new Promise<void>((resolve,reject)=>{const timeout=setTimeout(()=>{stream!.destroy();reject(Error('NODE_CONNECT_TIMEOUT'));},5000);stream!.once('connect',()=>{clearTimeout(timeout);resolve();});stream!.once('error',()=>{clearTimeout(timeout);reject(Error('NODE_CHANNEL_UNAVAILABLE'));});});
+  assertAction('initialize-runtime');
+  const binding={nodeId:config.nodeId,sandboxId,generation:config.generation,transportInstanceId:config.node.transportInstanceId,processInstanceId:randomUUID(),runId:run.id,fencingToken:run.fencingToken,sessionId:run.sessionId,turnId:run.turnId};
+  let attestation:NativePolicyAttestation|undefined;
+  const assertFresh=()=>{assertAction('initialize-runtime');if(Date.now()-observed.observedAt>30000||observed.observedAt>Date.now()||attestation&&(Date.now()-attestation.observedAt>30000||attestation.observedAt>Date.now()))throw Error('NODE_ATTESTATION_STALE');};
+  return {stream,key,binding,stopEvidenceRef:()=>attestation?.evidenceRef,
+   async attestRuntime(channel){
+    observed=await inspect();assertAction('initialize-runtime');const actual=await channel.attestRuntime(binding);assertAction('initialize-runtime');
+    if(actual.protocolVersion!==2||canonicalDigest(actual.binding)!==canonicalDigest(binding)||actual.policyDigest!==config.node.policyDigest||actual.runtime?.version!=='0.159.2'||actual.runtime.sha256!==config.node.runtimeDigest||!actual.environment?.clean||!actual.environment.privateHome||!actual.environment.privateProject||!actual.environment.privateCache||!actual.containment?.cgroupV2||!actual.containment.resources||!actual.containment.namespaces||actual.containment.projectReadOnly||!['none','gateway'].includes(actual.containment.network)||!Number.isFinite(actual.observedAt)||actual.observedAt>Date.now()||Date.now()-actual.observedAt>30000)throw Error('NODE_CONTAINMENT_ATTESTATION_REQUIRED');
+    attestation=actual;return actual;
+   },
+   assertSandbox(b){assertFresh();if(canonicalDigest(b)!==canonicalDigest(binding))throw Error('STALE_EXECUTION_BINDING');},
+   assertRuntimeEnvironment(b,environment){assertFresh();if(!attestation||canonicalDigest(b)!==canonicalDigest(binding)||canonicalDigest(environment)!==canonicalDigest((attestation.environment as unknown as {values:unknown}).values))throw Error('NODE_ENVIRONMENT_ATTESTATION_REQUIRED');}
+  };
+ }catch(error){stream?.destroy();key.fill(0);throw error;}
+}

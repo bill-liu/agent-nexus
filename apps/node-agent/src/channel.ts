@@ -7,7 +7,7 @@ import type { NativePolicyAttestation } from './control';
 import type { ApprovalBinding } from '../../../packages/core/src/approvals';
 import { canonicalManifest } from '../../../packages/catalog-client/src/manifest';
 export interface NodeChannelBinding { nodeId:string;sandboxId:string;generation:number;transportInstanceId:string }
-interface Payload { protocolVersion:2;channel:NodeChannelBinding;id:string;sequence:number;method:'receive'|'query'|'observeStop'|'verifyCandidate'|'nativeOpen'|'nativeWrite'|'nativeRead'|'nativeClose'|'approvalReceive'|'approvalRespond'|'approvalReplay'|'approvalResolved'|'approvalInterruptTurn'|'approvalGet'|'approvalCancel'|'driverInitialize'|'driverStartTurn'|'driverSteer'|'driverInterrupt'|'driverInspectAuth'|'driverReplyServerRequest'|'authLoginStart'|'authLoginCancel'|'authObserveLogin'|'prepareRun'|'attestRuntime'|'spoolReplay'|'spoolAcknowledge'|'finishNative'|'captureCandidate'|'stopNative';body:unknown;response:boolean }
+interface Payload { protocolVersion:2;channel:NodeChannelBinding;id:string;sequence:number;method:'receive'|'query'|'observeStop'|'verifyCandidate'|'nativeOpen'|'nativeWrite'|'nativeRead'|'nativeClose'|'approvalReceive'|'approvalRespond'|'approvalReplay'|'approvalResolved'|'approvalInterruptTurn'|'approvalGet'|'approvalCancel'|'driverInitialize'|'driverStartTurn'|'driverSteer'|'driverInterrupt'|'driverInspectAuth'|'driverReplyServerRequest'|'authLoginStart'|'authLoginCancel'|'authObserveLogin'|'prepareRun'|'attestRuntime'|'spoolReplay'|'spoolAcknowledge'|'finishNative'|'captureCandidate'|'stopNative'|'initializeEnvironment';body:unknown;response:boolean }
 interface Frame {payload:Payload;mac:string}
 const fingerprint=(value:unknown)=>canonicalManifest(value);
 /** Authenticates an already connected private stream (e.g. approved vsock bridge); never discovers host services. */
@@ -40,7 +40,7 @@ class AuthenticatedFrames {
   }
   if(!this.sessionKey)throw new Error('NODE_CHANNEL_AUTH_REQUIRED');
   const frame=decoded as Frame;const p=frame.payload;
-  if(!p||p.protocolVersion!==2||fingerprint(p.channel)!==fingerprint(this.binding)||p.sequence!==this.receiveSequence+1||typeof p.id!=='string'||!p.id||p.id.length>128||typeof p.response!=='boolean'||!['receive','query','observeStop','verifyCandidate','nativeOpen','nativeWrite','nativeRead','nativeClose','approvalReceive','approvalRespond','approvalReplay','approvalResolved','approvalInterruptTurn','approvalGet','approvalCancel','driverInitialize','driverStartTurn','driverSteer','driverInterrupt','driverInspectAuth','driverReplyServerRequest','authLoginStart','authLoginCancel','authObserveLogin','prepareRun','attestRuntime','spoolReplay','spoolAcknowledge','finishNative','captureCandidate','stopNative'].includes(p.method)||typeof frame.mac!=='string'||!/^[a-f0-9]{64}$/.test(frame.mac))throw new Error('NODE_CHANNEL_INVALID');
+  if(!p||p.protocolVersion!==2||fingerprint(p.channel)!==fingerprint(this.binding)||p.sequence!==this.receiveSequence+1||typeof p.id!=='string'||!p.id||p.id.length>128||typeof p.response!=='boolean'||!['receive','query','observeStop','verifyCandidate','nativeOpen','nativeWrite','nativeRead','nativeClose','approvalReceive','approvalRespond','approvalReplay','approvalResolved','approvalInterruptTurn','approvalGet','approvalCancel','driverInitialize','driverStartTurn','driverSteer','driverInterrupt','driverInspectAuth','driverReplyServerRequest','authLoginStart','authLoginCancel','authObserveLogin','prepareRun','attestRuntime','spoolReplay','spoolAcknowledge','finishNative','captureCandidate','stopNative','initializeEnvironment'].includes(p.method)||typeof frame.mac!=='string'||!/^[a-f0-9]{64}$/.test(frame.mac))throw new Error('NODE_CHANNEL_INVALID');
   if(!timingSafeEqual(this.mac(p),Buffer.from(frame.mac,'hex')))throw new Error('NODE_CHANNEL_INVALID');
   this.receiveSequence++;this.received(p);
  }
@@ -94,6 +94,7 @@ export class NodeRunnerChannel implements AsyncRunnerTransport,TrustedNodeVerifi
   }catch{try{this.frames.send({id:payload.id,method:payload.method,body:{ok:false},response:true});}catch{this.frames.close();}}
  }
  captureCandidate(binding:ExecutionBinding):Promise<import('../../verification-worker/src/candidate').SnapshotTransfer&{binding:ExecutionBinding}>{return this.request('captureCandidate',{binding}) as Promise<import('../../verification-worker/src/candidate').SnapshotTransfer&{binding:ExecutionBinding}>;}
+ initializeEnvironment(binding:ExecutionBinding):Promise<void>{return this.request('initializeEnvironment',{binding}) as Promise<void>;}
  stopNative(binding:ExecutionBinding):Promise<TrustedStopObservation|null>{return this.request('stopNative',{binding}) as Promise<TrustedStopObservation|null>;}
  finishNative(binding:ExecutionBinding):Promise<TrustedStopObservation|null>{return this.request('finishNative',{binding}) as Promise<TrustedStopObservation|null>;}
  replaySpool():Promise<SpoolEntry[]>{return this.request('spoolReplay',{}) as Promise<SpoolEntry[]>;}
@@ -139,7 +140,7 @@ export class NodeRunnerChannel implements AsyncRunnerTransport,TrustedNodeVerifi
 }
 /** Guest endpoint, composed with the persistent Runner and trusted Node observer. Key never enters Bot mounts. */
 export type NodeGuestEndpoint=(()=>void)&{approvalPort(binding:ExecutionBinding):CoreApprovalPort};
-export function serveNodeChannel(stream:Duplex,key:Buffer,binding:NodeChannelBinding,runner:AsyncRunnerTransport,verifier:TrustedNodeVerifier,verificationService?:{verifyCandidate(request:unknown):Promise<unknown>},nativeService?:{open(binding:ExecutionBinding):Promise<unknown>;write(binding:ExecutionBinding,data:string):Promise<unknown>;read(binding:ExecutionBinding):Promise<unknown>;close(binding:ExecutionBinding):Promise<unknown>},driver?:RuntimeDriver,authTransport?:DriverNativeAuthTransport|((binding:ExecutionBinding)=>DriverNativeAuthTransport),bundlePort?:PreparedDriverBundlePort,runtimeAttestation?:{attestRuntime(binding:ExecutionBinding):Promise<NativePolicyAttestation>;finishNative?(binding:ExecutionBinding):Promise<TrustedStopObservation|null>;stopNative?(binding:ExecutionBinding):Promise<TrustedStopObservation|null>;captureCandidate?(binding:ExecutionBinding):Promise<import('../../verification-worker/src/candidate').SnapshotTransfer&{binding:ExecutionBinding}>},spool?:Pick<RunnerSpool,'replayAvailable'|'acknowledge'>):NodeGuestEndpoint {
+export function serveNodeChannel(stream:Duplex,key:Buffer,binding:NodeChannelBinding,runner:AsyncRunnerTransport,verifier:TrustedNodeVerifier,verificationService?:{verifyCandidate(request:unknown):Promise<unknown>},nativeService?:{open(binding:ExecutionBinding):Promise<unknown>;write(binding:ExecutionBinding,data:string):Promise<unknown>;read(binding:ExecutionBinding):Promise<unknown>;close(binding:ExecutionBinding):Promise<unknown>},driver?:RuntimeDriver,authTransport?:DriverNativeAuthTransport|((binding:ExecutionBinding)=>DriverNativeAuthTransport),bundlePort?:PreparedDriverBundlePort,runtimeAttestation?:{initializeEnvironment?(binding:ExecutionBinding):Promise<void>;attestRuntime(binding:ExecutionBinding):Promise<NativePolicyAttestation>;finishNative?(binding:ExecutionBinding):Promise<TrustedStopObservation|null>;stopNative?(binding:ExecutionBinding):Promise<TrustedStopObservation|null>;captureCandidate?(binding:ExecutionBinding):Promise<import('../../verification-worker/src/candidate').SnapshotTransfer&{binding:ExecutionBinding}>},spool?:Pick<RunnerSpool,'replayAvailable'|'acknowledge'>):NodeGuestEndpoint {
  let active=0;
  const pending=new Map<string,{method:Payload['method'];resolve:(value:unknown)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
  const frames=new AuthenticatedFrames(stream,Buffer.from(key),structuredClone(binding),payload=>{
@@ -174,6 +175,10 @@ export function serveNodeChannel(stream:Duplex,key:Buffer,binding:NodeChannelBin
      if(payload.method==='authLoginStart')value=await selectedAuth.loginStart(payload.body as Parameters<DriverNativeAuthTransport['loginStart']>[0]);
      else if(payload.method==='authLoginCancel')value=await selectedAuth.loginCancel(payload.body as Parameters<DriverNativeAuthTransport['loginCancel']>[0]);
      else value=await selectedAuth.observeLogin(payload.body as Parameters<DriverNativeAuthTransport['observeLogin']>[0]);
+    } else if(payload.method==='initializeEnvironment') {
+     const body=payload.body as {binding:ExecutionBinding},b=body?.binding;
+     if(!body||Object.keys(body).length!==1||!b||b.nodeId!==binding.nodeId||b.sandboxId!==binding.sandboxId||b.generation!==binding.generation||b.transportInstanceId!==binding.transportInstanceId||!runtimeAttestation?.initializeEnvironment)throw Error('ACCOUNTLESS_INITIALIZE_REQUIRED');
+     value=await runtimeAttestation.initializeEnvironment(b);
     } else if(payload.method.startsWith('driver')) {
      const input=payload.body as {binding:ExecutionBinding};const b=input?.binding;
      if(!driver||!b||b.nodeId!==binding.nodeId||b.sandboxId!==binding.sandboxId||b.generation!==binding.generation||b.transportInstanceId!==binding.transportInstanceId)throw new Error('STALE_SANDBOX');

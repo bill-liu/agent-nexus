@@ -160,3 +160,23 @@ A3同启动崩溃恢复仍UNKNOWN/B3阻塞，guest自主关机后的machine退�
 **首次桌面接入仍有实现阻塞：** 当前新helper仅inspect/connect、provisionRequest拒绝PREINSTALLED_TARGET_REQUIRED；Core.provision的assertAdmitted还依赖model.request、auth入口依赖login。N3 initialize-only没有独立业务入口，不能仅加provider.start或另起helper绕锁。经新增要求复核，补齐需要新的受信环境初始化业务入口/准入映射、同一helper0→1生命周期、fullbinding/fence/epoch与owned cleanup，已在runbook列为明确N3-0下一代码切片；本轮不掩盖缺口，不引入无使用者API或扩大model权限。
 
 真实ARM64准备环境/Mac目标、download/install/disk/chroot/entitlement/start/initialize分项批准均未确认；没有访问用户Mac、真实配置凭据、安装/挂载/boot/CLI/login/model/费用。只取小公开元数据（含8.5KB Sigstore bundle解析，密码学验签未执行）。same-boot恢复/硬RAM/IP-only/quotas及实际隔离/TaskA/B门禁保留。**N2交付准备配方和边界代码，尚非可直接运行的桌面首装；N3/N4没有自动推进，P1未完成。**
+
+## N3-0：独立环境初始化入口（代码/合成）
+
+读取基点 main `c40a4b5cb99e78d2c5873644abe902ee07f26245`，Issue1评论6138431132；v1.3设计blob与原门禁不变，复用完整阅读记录并重读涉及的完整章节。按用户最新明确要求实现 [runbook §9](p1-bootstrap-runbook.md#9-n3-0-代码入口无真实操作)，不重复N1/N2、不执行真实N3/N4。
+
+Main/Preload/Core独立窄业务入口与环境专用保护准入，不要求Connection/model/login Grant。短事务意图/epoch/fence复用原provision记录，受理RECEIVED不等于完成；同helper inspect/create0/start1/connect、专用guest固定initialize、full binding冻结与实时准入、owned native/VM cleanup。Core/guest保持 initialize-only/network:none/空认证配置，成功auth:false/liveReady:false，原长期身份/磁盘保留。未知回执/错误代际/租约或owner变更阻塞，原command完成回执可查；未完成intent和清理失败不重播，shutdown报告未确认环境operation。
+
+根观察新增入口/准入/专用channel缺失RED，以及撤权清理owner误判、版本变化、binding漂移、遗漏退出未知项、已启动代际未保留和最终expiry状态缺陷RED→GREEN。既有BotProvisioner支持不传下载依赖的installed adoption，调用provision仍在任何create前拒绝缺下载依赖。原model/login路线不扩大权限。
+
+本地 Linux x64/Node24.19：新增3contract文件28项通过；完整49文件574项、typecheck/build/diff退出0。scripted helper与in-memory Codex peer只是协议桩，虽然构造live形状用于校验，也不是真实VM/CLI证据。actualNode空配置检查用小私有目录；安装manifest元数据校验不代表实际大盘hash/签名/BOM通过。Mac默认准备拒绝入口回归将在本提交own-SHA CI读取；最终四组CI/测试包摘要和独立审查范围另记Issue1回执，不预写成功。
+
+实际用户Mac/ARM64准备主机、验签/安装/raw/EFI/UEFI/guest/VSock、无账号正向CLI、文件/网络/子进程负向全部NOT_RUN；同启动UNKNOWN、guest自主关机退休、硬RAM、细粒度网络/配额、160000byte transfer与A5 UTF8结构范围限制保留。stopped≥1自动cold restart、未知operation自动恢复不在本切片。下一步先集中确认N3具名目标/操作者/窗口与§8分项操作，仍不请求N4账号/模型/费用。**入口已实现不等于设备操作已获准，P1未完成。**
+
+### N3-0 一次独立审查与根修正
+
+冻结27file diff SHA256 `2ebdff4e…73b669d` 的 GPT6.1-SOL high 独立串行审查，完整相关设计/源码及实际3files28、相邻8files48、scratch6实验；实验中4项证明缺陷发生，另外2项证明lost-connect/initialize回执断连保持UNKNOWN，不把6实验全部写成安全PASS。提出 I-N3-01 adoption跨await覆盖新owner/epoch、I-N3-02 inspect后撤权仍connect、I-N3-03 Swift小数毫秒观察格式不相容；根一次修正，5个失败用例RED→GREEN，再扩同一owner问题的adoption返回后/最终事务获取2回归RED→GREEN。所有权基准不从新DB record刷新；adoption每await重验及最终短事务CAS、Core写入epoch条件和最终owner检查防覆盖。共享connect/socket/attestation各边界重验，环境带入原owner/epoch/Bot版本；失败毁stream/清key。helper观察按原number协议允许finite小数毫秒，仍必须非未来、30秒内且live/确切state/generation。
+
+根修正后定向4files42、完整49files581、typecheck/build/diff通过；这是根验证，不称独立补丁复审。保留 Minor M-N3-01：环境卡暂未显示检验时间和具体native/VM cleanup字段，现有文案只声明本次验证、不代表当前在线；后续补窄读模型展示。独立报告/实验保留当前工作区`an-n3-0-work`，最终本提交CI/摘要以Issue1最终回执为准。
+
+范围判断：已停止generation≥1的冷重启、guest代际配置维护及转入N4的同owner model/login接续仍需后续代码，设备/账号授权本身不能代替实现。此次没有第二轮独立审查或任何live操作。

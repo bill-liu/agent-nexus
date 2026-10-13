@@ -187,6 +187,10 @@ final class Host {
                 records[request.sandboxId] = Record(generation: 0, botId: spec.botId, operationId: operation, state: "created", hostBootID: try hostBootID())
                 try save(); completion(.success(response(request, state: "created"))); return
             }
+            // Only an exact generation-zero inspection may prove an authorized target absent.
+            if request.command == "inspect", request.generation == 0, records[request.sandboxId] == nil {
+                completion(.success(response(request, state: "absent"))); return
+            }
             guard var record = records[request.sandboxId], record.generation == request.generation else { throw HostFailure("STALE_SANDBOX") }
             switch request.command {
             case "inspect":
