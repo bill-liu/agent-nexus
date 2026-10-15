@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS p1_bot_configuration(bot_id TEXT PRIMARY KEY REFERENC
 CREATE TABLE IF NOT EXISTS p1_run_input(run_id TEXT PRIMARY KEY,candidate_digest TEXT NOT NULL,snapshot_ref TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS p1_run_request(run_id TEXT PRIMARY KEY,request TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS p1_runner_cursor(channel_id TEXT PRIMARY KEY,cursor INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS podman_preparation(operation_id TEXT PRIMARY KEY REFERENCES bot_provision(operation_id),record TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS podman_sandbox_state(operation_id TEXT PRIMARY KEY REFERENCES bot_provision(operation_id),record TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS p1_desktop_command(command_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,result TEXT NOT NULL);
 `;

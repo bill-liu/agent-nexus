@@ -201,3 +201,19 @@ Main/Preload/Core独立窄业务入口与环境专用保护准入，不要求Con
 **仍有代码与实物前置：** 新保护准入的桌面首装接线、已验 provenance 的基础/CLI输入、真实 OCI build/digest/下载路径、每Run精确停止及一般任务重用、所需网关/细粒度网络/备份实现尚未交付。本切片提供受信 accountless factory，不把配置 Provider seam 当成默认 App 已能首装，也不把旧 NativePolicyAttestation 改名成 Podman 保护证明。取得设备授权本身不能填平这些实现缺口。
 
 本轮没有安装 Podman、启动 Machine/容器、拉取大镜像、生成管理密钥/持久凭据、触及用户 Mac、登录、调用模型、配置账单或发布镜像。后续先落实新的 Podman 具名设备/操作/资源/下载范围与对应代码，再验证原 Task A/B；A/B 另需具名 Connection/数据/计费准入。**全部 Podman live 门禁及 P1-B 仍未通过，P1 未完成。**
+
+## Podman 桌面准备接线（代码/合成）
+
+基点 `be16a84dc1131c5ff354357401ad18e52618432a`；[本轮计划](../plans/podman-desktop-preparation.md)、[具名 Mac 范围清单](podman-mac-scope.md)。复用前一提交 Provider、同一 Core/provision/backend journal 和 Runner/Codex 通路，不执行旧 VM 路线。新增独立保护用途 `podman-environment-prepare`，明确设备IOPlatformUUID的本机hash绑定、引擎/镜像/可执行pin、操作集合、期限及有界原owner cleanup期限。仅保护文件授权，Renderer只有commandId/Bot/version；主进程权限/模式检查、worker prepare/cancel窄接线，默认无配置仍拒绝。
+
+Core短事务冻结owner/epoch/Bot version/fence/plan digest，受理后异步执行；重复点击加入原操作，未知/跨重启不重放。取消标记单调、派生代际和新owner不被旧操作覆盖；过期/引擎配置变化拒绝新效果，仅有有效清理范围时查询并停止原Bot容器。scripted证据不能标记live readiness；初始化不授予登录/模型，liveReady仍false。桌面展示计划、候选来源/版本、未知预算、授权和操作状态；安装/拉取/Machine操作仍未实现，不启用模拟安装器。
+
+公开OCI输入工具验证固定base digest契约、bundle/Codex SHA及Linux/arm64 ELF，独占新私有context，只写allow-list文件和确定性manifest；不递归拷贝、不复制pins/私有路径，不执行下载、Podman或镜像构建。manifest的contextInputBytes为本地公开输入字节，不是OCI下载/展开预算；OCI digest:null、NOT_BUILT。实际制品、签名/来源与发行许可仍需具名制品核验。
+
+一次串行独立审查冻结19files patch `a709efd5…230d`，审查者读取限定相关设计/完整改动及相邻接口，定向3files20/20，未重复全库或真实操作。实证发现Important：删除保护配置后raw ENOENT路径可经RPC/最终ProvisionRecord.errorCode进入Renderer。根一次修正同步RPC、异步completion和持久错误字段；before/during两回归先RED（暴露完整fixture路径）→GREEN。没有第二轮补丁独立复审。Minor保留：环境卡尚未显示实际选定Runner OCI的version/digest/source revision，真实批准前须看保护配置/输入manifest。
+
+根最终 Linux x64/Node24.19：新增3files24项；完整54files621项、typecheck/build/diff通过。真实SQLite/channel/Driver搭配scripted CLI/合成Codex peer，覆盖缺范围、变更/过期、重复、取消、owner/fence、恢复不重放、假证据不报live、公开输入和设备hash解析等边界；不是实际Mac/Podman/CLI证据。Mac包测试增加默认计划展示/取消拒绝断言，own-SHA结果推送后读取并写Issue1，不预写成功。
+
+保留明确限制：Bot.version变化（如暂停）使原意图及清理失效，可留下运行中的AN空闲容器并保持UNKNOWN；不自动重新取得owner。Stopped≥1/丢client handle/未知写者的恢复、Machine安装/来源/digest/零共享配置、真实OCI build/digest/下载、实际资源/跨Bot/子写者负例、网关/备份/一般TaskA/B仍未完成。权限不能替代这些代码/证据。详情见具名清单，真正安装/下载/资源/管理密钥/System权限/账号/公共发布须额外确认。
+
+本轮只在云端改代码、生成小合成context、运行测试与标准CI；没有接入用户Mac、调用ioreg读取真实设备、安装Podman、下载大制品、创建/启动Machine或容器、生成持久管理凭据、登录、模型/费用或公共镜像发布。**真实Podman与P1-B/P1整体仍未通过。**

@@ -8,7 +8,7 @@ import {NodeRunnerChannel} from '../../../apps/node-agent/src/channel.js';
 /** Trusted accountless composition seam. No Renderer route/admission autodiscovery or model capability.
  * Core's current owner/epoch/Bot version and named action authorization must be rechecked synchronously.
  * A synthetic peer can verify this path, but only a live admitted engine can produce live observations. */
-export function createPodmanEnvironmentAdapter(options:{db:DatabaseSync;target:PodmanTarget;cli:PodmanCLI;assertCurrent():void;assertAuthorized(action:string):void}){
+export function createPodmanEnvironmentAdapter(options:{db:DatabaseSync;target:PodmanTarget;cli:PodmanCLI;assertCurrent():void;assertAuthorized(action:string):void;cleanup?:{begin():void;end():void}}){
  const sync=(fn:()=>void)=>{const result:unknown=fn();if(result!==undefined){if(result instanceof Promise)void result.catch(()=>{});throw Error('INVALID_AUTHORITY_CHECK');}};
  const current=()=>{sync(options.assertCurrent);const row=options.db.prepare('SELECT record FROM bot_provision WHERE operation_id=?').get(options.target.operationId);const r=row&&JSON.parse(String(row.record));if(!r||r.botId!==options.target.botId||r.sandboxId!==options.target.sandboxId)throw Error('PODMAN_IDENTITY_MISMATCH');};
  const authorize=(action:string)=>{current();sync(()=>options.assertAuthorized(action));};
@@ -24,7 +24,7 @@ export function createPodmanEnvironmentAdapter(options:{db:DatabaseSync;target:P
    channel?.close();stream?.destroy();key.fill(0);
    // Always isolate the sole owning Bot container; EOF/native parent exit never releases its writer.
    // A failed stop/authorization leaves the durable writer and intent for explicit reconciliation.
-   await provider.isolateWriter(frozen,writer);
+   options.cleanup?.begin();try{await provider.isolateWriter(frozen,writer);}finally{options.cleanup?.end();}
   }
   authorize('initialize-runtime');return {backend:'podman' as const,evidenceKind:options.cli.evidenceKind,initialized,readiness:{environment:true,runner:true,runtime:true,auth:false},liveReady:false as const};
  }};

@@ -14,6 +14,7 @@ port.on('message',({data:request})=>{work=work.then(async()=>{
  try{
   if(typeof request.id!=='string' || request.subject!=='local-user')throw Error('UNAUTHORIZED_SUBJECT');let result:unknown;
   switch(request.type){
+   case 'environment-cancel':if(!(application instanceof P1Application))throw Error('P1_COMMAND_UNAVAILABLE');result=application.cancelEnvironmentPreparation(request.environment!,request.subject);port.postMessage({type:'changed'});break;
    case 'environment':if(!admitting)throw Error('APP_QUITTING');if(!(application instanceof P1Application))throw Error('P1_COMMAND_UNAVAILABLE');result=application.beginEnvironmentPreparation(request.environment!,request.subject);port.postMessage({type:'changed'});break;
    case 'auth':if(!(application instanceof P1Application))throw Error('P1_COMMAND_UNAVAILABLE');result=await application.auth(request.auth!,request.subject);break;
    case 'material':if(!(application instanceof P1Application))throw Error('P1_COMMAND_UNAVAILABLE');result=application.importMaterial(request.material!,request.subject);port.postMessage({type:'changed'});break;

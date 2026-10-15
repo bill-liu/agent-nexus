@@ -1,8 +1,9 @@
+export type PodmanPreparationView={backend:'podman';phase:'blocked'|'ready-to-prepare'|'preparing'|'cancelling'|'cancelled'|'complete'|'unknown';authorization:'missing'|'authorized'|'expired'|'changed';planDigest:string|null;engine:{connection:string;machine:string}|null;budgets:{downloadBytes:number|null;machineDiskBytes:number|null;machineMemoryBytes:number|null;containerMemoryBytes:number|null;containerCPUs:number|null};sources:{name:string;version:string;url:string}[];steps:{id:string;label:string;implemented:boolean;authorization:'required'|'granted'}[];blockers:string[];canCancel:boolean;operationCommandId?:string;errorCode?:string};
 import type {Input} from './commands.js';
 export type BotView={id:string;name:string;owner:string;version:number;acceptingTasks:boolean;dispatchPaused:boolean;sandboxId:string;generation:number};
 export type TaskView={id:string;botId:string;text:string;revision:number;status:string};
 export type RunView={id:string;botId:string;taskId:string;state:string;slotHeld:boolean;version:number;fencingToken:number};
-export type EnvironmentView={botId:string;operationId:string;sandboxId:string;generation:number;stage:string;readiness:{environment:boolean;runner:boolean;runtime:boolean;auth:boolean};liveReady:boolean;evidenceKind:string;connectionId:string|null;errorCode?:string;canInitialize?:boolean;initialization?:{commandId:string;expectedVersion:number;completedAt?:number;cleanup?:{native:boolean;vm:boolean}}};
+export type EnvironmentView={botId:string;operationId:string;sandboxId:string;generation:number;stage:string;readiness:{environment:boolean;runner:boolean;runtime:boolean;auth:boolean};liveReady:boolean;evidenceKind:string;connectionId:string|null;errorCode?:string;canInitialize?:boolean;preparation?:PodmanPreparationView;initialization?:{commandId:string;expectedVersion:number;completedAt?:number;cleanup?:{native:boolean;vm:boolean}}};
 export type ConnectionView={id:string;name:string;authMethod:string;billingSource:string;billingEvidence:string;route:string;status:string;revision:number;fallbackPolicy:string};
 export type ApprovalView={id:string;botId:string;runId:string;action:string;parameters:unknown;requestHash:string;status:string;expiresAt:number};
 export type AuthInput={action:'begin';botId:string;expectedVersion:number}|{action:'inspect'|'cancel'|'view';botId:string;flowId:string};
@@ -20,6 +21,7 @@ export type Snapshot={mode?:'p0-demo'|'p1-preparation';materials?:MaterialView[]
 export type DesktopEvent={type:'changed'|'unavailable'|'compose'|'navigate';botId?:string};
 export type AssetSelection={name:string;text:string;bytes:number;source:'system-dialog';policy:'local-only'};
 export interface DesktopBridge {
+ cancelEnvironment(input:EnvironmentInput):Promise<{operationId:string;acceptance:'RECEIVED'}>;
  prepareEnvironment(input:EnvironmentInput):Promise<{operationId:string;acceptance:'RECEIVED'}>;
  snapshot():Promise<Snapshot>;
  auth(input:AuthInput):Promise<AuthView>;
@@ -40,5 +42,5 @@ export interface DesktopBridge {
  requestQuit(choice:'begin'|'cancel'|'save'):Promise<{unknownRuns:string[]}>;
  subscribe(listener:(event:DesktopEvent)=>void):()=>void;
 }
-export type WorkerRequest={id:string;type:'snapshot'|'command'|'admissions'|'shutdown'|'auth'|'material'|'environment';subject:string;command?:import('./commands.js').Command;accepting?:boolean;auth?:AuthInput;material?:MaterialInput;environment?:EnvironmentInput};
+export type WorkerRequest={id:string;type:'snapshot'|'command'|'admissions'|'shutdown'|'auth'|'material'|'environment'|'environment-cancel';subject:string;command?:import('./commands.js').Command;accepting?:boolean;auth?:AuthInput;material?:MaterialInput;environment?:EnvironmentInput};
 export type WorkerReply={id:string;ok:boolean;result?:unknown;error?:string;sqliteVersion?:string};
