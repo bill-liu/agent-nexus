@@ -217,3 +217,19 @@ Core短事务冻结owner/epoch/Bot version/fence/plan digest，受理后异步�
 保留明确限制：Bot.version变化（如暂停）使原意图及清理失效，可留下运行中的AN空闲容器并保持UNKNOWN；不自动重新取得owner。Stopped≥1/丢client handle/未知写者的恢复、Machine安装/来源/digest/零共享配置、真实OCI build/digest/下载、实际资源/跨Bot/子写者负例、网关/备份/一般TaskA/B仍未完成。权限不能替代这些代码/证据。详情见具名清单，真正安装/下载/资源/管理密钥/System权限/账号/公共发布须额外确认。
 
 本轮只在云端改代码、生成小合成context、运行测试与标准CI；没有接入用户Mac、调用ioreg读取真实设备、安装Podman、下载大制品、创建/启动Machine或容器、生成持久管理凭据、登录、模型/费用或公共镜像发布。**真实Podman与P1-B/P1整体仍未通过。**
+
+## Podman 两项准备前收口（代码/合成）
+
+基点 `f91f3f074486d58b008df436c24dcaadd0f5289b`。用户指定只修两项既知缺口，串行实施；[现有准备计划](../plans/podman-desktop-preparation.md)与[具名 Mac 范围/官方资产元数据](podman-mac-scope.md)已更新，不另建平台。前节暂停清理及OCI展示限制是当时事实，保留历史；本节记录新证据。
+
+暂停/版本变化的两条回归先RED：start回执中断及exec打开后都留下running容器。根因是新效果准入与原owner清理共用严格Bot.version检查。修正后正常create/start/connect/initialize继续受原版本约束；只有本次存活controller的冻结owner/plan及execution binding可在原cleanup期限内，凭同一Core epoch、Bot owner/sandbox/代际、provision command/request/expectedVersion/fence和实际Provider归属/契约对账，仅停止原Bot容器。跨epoch/替代owner或绑定/代际变更不能接管；不改变原动作集合和期限，不停止共享Machine/其他Bot，不清卷。终态记录不重新授权新操作，readiness仍须正常完整准入；start回执不明即使随后停下仍保留UNKNOWN，不伪造完成。
+
+已打开写者沿用原client确认关闭、精确token/binding及容器PID0/无exec/退出读回证明；未知PID/foreign binding/丢client handle/过期cleanup保留UNKNOWN与写者锁。仅容器running/stopped状态不释放写者。合成回归覆盖暂停后的最小停止、无新exec/重复工作、两个持久绑定同时被替换仍拒绝、原epoch/fence/代际边界；没有实现跨重启、Stopped≥1或一般Run冷恢复。
+
+环境卡和契约增加完整OCI reference、version、单平台manifest digest、source revision：默认NOT_BUILT并明确四个缺失字段；保护配置完整也只显示DECLARED_NOT_VERIFIED，不代表实际镜像build/pull/inspect。缺省与声明展示两条先RED→GREEN，真实包测试增加默认缺失状态断言；声明是合成目标，不能批准为真实镜像。
+
+官方release API仅只读记录Podman6.1.4 arm64 pkg/客户端zip/shasums及Codex0.159.2 Linux/arm64 musl归档的精确bytes和API digest；没有下载本体，未独立验hash/签名/公证/安装效果或解包后ELF。Machine OS和Node base单平台digest、真实Runner构建digest、Machine/OCI下载/展开/资源及卷增长上限仍未知/未授权，现有清单要求在真实下载/分配前填写具名可接受上限，不借用旧VM预算。
+
+根 Linux x64/Node24.19.0：完整54files630项、typecheck/build/diff通过（比基点新增9项，原测试不替换）。Provider/adapter使用scripted CLI、合成peer，SQLite/channel/Driver为实际代码；这是代码/合成证据。一次限定diff独立串行审查冻结patch `b35d400c…52632`，完整检查相邻owner/adapter/journal/provider/process语义及随后report追加，没有Critical/Important/Minor发现；独立定向3files40项通过，不重复全库/包/真机。推送后own-SHA四组标准CI结果以Issue1最终回执固定，未预写成功，未冒用旧包摘要。
+
+没有安装或启动Podman、Machine/容器，没有镜像/安装包下载、持久凭据生成、接入用户Mac、账号/模型/计费或发布镜像。实际Mac只读范围仍须具名设备/窗口/既有管理identity使用批准；安装、Machine/管理密钥、OCI获取/构建、容器和资源动作分别另获批准，许可/预算/实现/实际JSON与隔离负例均不能由批准替代。原TaskA/B及网关/Connection/备份/性能/全部Podman live门禁、P1-B与P1整体保持未完成。

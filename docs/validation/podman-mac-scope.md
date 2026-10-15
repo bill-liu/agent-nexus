@@ -12,10 +12,10 @@
 
 | 项目 | 固定候选 / 来源 | 已知与未知 |
 |---|---|---|
-| Podman CLI / 服务 | 6.1.4，[官方 release](https://github.com/podman-container-tools/podman/releases/tag/v6.1.4)，源码464c15fec06f0074c916f9eff87c4806869c2833 | Mac安装包具体资产、SHA、压缩下载与安装后磁盘量尚未捕获；不下载、不安装 |
+| Podman CLI / 服务 | 6.1.4，[官方 release](https://github.com/podman-container-tools/podman/releases/tag/v6.1.4)，源码464c15fec06f0074c916f9eff87c4806869c2833 | arm64 .pkg资产76,099,040 bytes及发布API摘要见下表；只读元数据，未下载或核验本体/签名，安装后磁盘量未知 |
 | Podman Machine OS | [6.1.4官方init文档](https://github.com/podman-container-tools/podman/blob/464c15fec06f0074c916f9eff87c4806869c2833/docs/source/markdown/podman-machine-init.1.md.in)指定官方 quay.io/podman/machine-os | 平台对应版本/digest/下载大小尚未锁定；Machine RAM/CPU/虚拟盘/宿主实际占用未知，不能沿用旧4GiB/50–70GiB估算 |
 | OCI Node基底 | docker.io/library/node，24.19.0-bookworm-slim，Linux/arm64 | 必须另锁单平台 digest；拉取字节、展开层和共享缓存增量未知 |
-| Codex CLI | 0.159.2，[官方release](https://github.com/openai/codex/releases/tag/rust-v0.159.2) | Linux/arm64制品、归档校验/签名/许可与原生可执行SHA仍需对应制品核验；本轮不取二进制、不登录 |
+| Codex CLI | 0.159.2，[官方release](https://github.com/openai/codex/releases/tag/rust-v0.159.2) | 官方Linux/arm64 musl归档公开大小/发布摘要见下表；归档本体/签名/许可、解包后ELF SHA仍未核验；不取二进制、不登录 |
 | AN Runner镜像 | 版本/源码revision/公开输入hash由context工具固定 | **NOT_BUILT，OCI digest未知，下载字节未知**；contextInputBytes仅本地公开输入字节和，不能当镜像/磁盘预算 |
 | 容器与工作卷 | 用户具名配置CPU/内存/PID上限；每Bot work/private两卷 | 上限不是实测峰值，未提供配置时不设虚构默认预算。卷增长/配额/备份空间未知；Machine内卷不是备份 |
 
@@ -38,7 +38,21 @@
 
 当前没有上述真机批准，没有安装、下载大制品、生成管理密钥、创建Machine、启动容器、使用账号或模型。部分真实字段/执行效果只有接入具名引擎后才能核验；这些保持 BLOCKED/NOT_RUN，其他云端代码与合成回归照常完成。
 
-## 当前代码的恢复限制
+## 本轮代码收口及保留限制
 
-- Bot.version 在准备中变化（例如点击暂停）会使原意图失效，包括原容器清理。当前保持 UNKNOWN、拒绝后续写者，可能留下运行中的 AN 空闲容器；不能把退出 App 当作该容器已停。这一情况仍需受信 owner/版本对账代码及具名目标实测，不以停止共享Machine绕过。
-- 现有环境卡只显示通用软件来源/版本，尚未展示已选 Runner OCI 的完整 version/digest/source revision；独立审查列为 Minor。真正批准前应在受保护配置及公开输入manifest中逐项核对，不能仅凭UI计划hash批准未知镜像。
+- Bot.version变化仍即时阻止create/start/connect/initialize；仅本次仍存活的原controller可在原cleanupExpiresAt内，以冻结owner/plan、同一Core epoch、Bot owner/sandbox/代际、原provision command/request/fence/expectedVersion及原execution binding对账和最小停止。只允许原具名引擎上的查询/原Bot容器stop，不扩大既有cleanup动作/期限，不接纳新操作/替代owner或停共享Machine/其他Bot。start回执途中版本变化仍保留UNKNOWN操作，即使随后已核验原容器停下；不会标记初始化完成或自动重试。
+- 已打开写者还必须确认原本地exec client关闭，原token/binding、容器归属/代际及PID0/无exec/退出读回完整后才释放；未知PID、错绑定、失去client handle/epoch、过期cleanup或竞争Run继续UNKNOWN/保锁。跨Core重启、Stopped≥1和一般Run恢复未实现，不通过版本宽容清理来接管旧意图。
+- 环境卡显示完整Runner OCI reference、version、单平台manifest digest与source revision。默认`NOT_BUILT`并列缺失字段；保护配置齐备仅显示`DECLARED_NOT_VERIFIED`，不是已构建/拉取/inspect成功。缺失digest不能由UI确认补足，原始保护配置仍须与实际镜像/公开输入manifest一致。合成样例不是可批准的真实镜像。
+
+## 官方候选资产元数据（2026-10-15 UTC只读捕获）
+
+来源：[Podman v6.1.4发布API](https://api.github.com/repos/podman-container-tools/podman/releases/tags/v6.1.4)、[Codex rust-v0.159.2发布API](https://api.github.com/repos/openai/codex/releases/tags/rust-v0.159.2)。以下SHA256是API的`digest`声明，不是本轮下载后的独立hash/签名/公证核验，也不是已安装可执行文件的pin。没有下载任何资产。Podman release可变，真正下载前须重新固定同一资产及摘要。
+
+| 候选官方资产 | 精确下载bytes | 发布API SHA256 |
+|---|---:|---|
+| [podman-installer-macos-arm64.pkg](https://github.com/podman-container-tools/podman/releases/download/v6.1.4/podman-installer-macos-arm64.pkg)，asset634977388 | 76099040 | `48f675622f66233ca2116e67fdab41ed9dbcc25b48b78a8e6ef0be6549031d22` |
+| [podman-remote-release-darwin_arm64.zip](https://github.com/podman-container-tools/podman/releases/download/v6.1.4/podman-remote-release-darwin_arm64.zip)，asset634977395，备选客户端归档；不默认为含完整Machine所需组件 | 25498436 | `dadcb94999dcb7f19f8269e292fc56d2bfbe2bfab5826981a568a466bff26843` |
+| [Podman shasums](https://github.com/podman-container-tools/podman/releases/download/v6.1.4/shasums)，asset634977474，尚未读取内容 | 830 | `2e2137f14806c5efb43fcd63ff8ed53747a499e83793fe07993d972eb6db9b79` |
+| [codex-aarch64-unknown-linux-musl.tar.gz](https://github.com/openai/codex/releases/download/rust-v0.159.2/codex-aarch64-unknown-linux-musl.tar.gz)，仅候选，实际镜像兼容性未测 | 100955214 | `472ee4d49464a4f8792bbf0162bd9ac18d7036dbc00900a03e95f715887e930f` |
+
+**授权上限仍待填写，不是默认预算：** 安装资产单次及总下载bytes上限、安装后宿主磁盘增量上限；Machine OS精确版本/arm64 digest及下载bytes上限、Machine CPU/RAM/虚拟盘和宿主实际增量上限；OCI base/Runner及CLI输入各自digest/下载bytes、展开/构建缓存和总磁盘上限；每Bot两卷增长/配额和备份空间上限。当前这些上限均为未授权/未知；不能从安装包大小推算，也不能继承旧VM的4GiB/50–70GiB数值。必须先核验来源并取得可接受的具名数值上限，才进入相应真实下载/分配阶段。上述现有prepare准入不包含安装/拉取/Machine创建，也不因显示资产元数据而获得这些权限。
