@@ -180,3 +180,24 @@ Main/Preload/Core独立窄业务入口与环境专用保护准入，不要求Con
 根修正后定向4files42、完整49files581、typecheck/build/diff通过；这是根验证，不称独立补丁复审。保留 Minor M-N3-01：环境卡暂未显示检验时间和具体native/VM cleanup字段，现有文案只声明本次验证、不代表当前在线；后续补窄读模型展示。独立报告/实验保留当前工作区`an-n3-0-work`，最终本提交CI/摘要以Issue1最终回执为准。
 
 范围判断：已停止generation≥1的冷重启、guest代际配置维护及转入N4的同owner model/login接续仍需后续代码，设备/账号授权本身不能代替实现。此次没有第二轮独立审查或任何live操作。
+
+## Podman P0：Provider 与无账号通路（合成代码切片）
+
+基点 `41671869d78a5c250ee2a839b6aae8358a6f3421`，读取 Issue1 `6198835980`，计划/阅读回执 `6199045805`；[迁移映射](../plans/podman-first-slice.md)。最新 ADR 取代旧 helper/Ubuntu/外部 ARM64 制备路线及旧 VM 授权包的默认前置，前文原始实现和失败/通过历史全部保留。本节不将旧 581 项改记为 Podman PASS。
+
+新增固定候选 Podman6.1.4 的显式 connection/Machine/URI/已有 identity 检查、零宿主共享、rootless/cgroupv2 controllers、不可变 OCI version/digest/架构/协议/源码/Codex pin。只有已存在的镜像，`--pull=never`；每 Bot 的 work/private 具名卷、归属标签、只读根/非 root/无网络/资源/挂载读回、生命周期与代际。CAS intent/sole-writer 放同一 Core DB 的 provision 外键行，避免旧 ProvisionRecord 保存抹掉后端意图。重复请求与失联先 inspect 对账，无法证明的投递不重放。未操作全局默认、Machine 生命周期、无关容器或卷清理。
+
+新增受信 Core 无账号 adapter，经固定 exec stdio/临时 channel key 接原 Node channel、GuestRuntimeRegistry 和 Codex Driver；仅 initialize，不提供 turn/login/task/native任意命令或旧 cgroup/BPF attestation。一个写者只打开一次 exec；EOF/父 CLI 退出不清锁。关闭并确认本地 exec client 后，仅停止 exact owned Bot 容器，以完整绑定及 PID0/无 exec/退出状态读回形成 isolation（不伪造 native exit-code）；丢回执、未确认子进程/错绑定/失去 client handle 或准入保留持久写者。非 Bot 资源不受此 fallback 影响。
+
+| 实际验证 | 结果及证据边界 |
+|---|---|
+| Linux x64 / Node24.19.0 / npm11.9.0 | 新增2文件16项，完整51文件597项通过；typecheck/build/diff通过。新测试是 scripted CLI + 合成 Codex peer，实际使用 SQLite、channel/Registry/Driver，不是真实 Podman/CLI |
+| 失败→修正 | 初始缺 Provider/端点 RED；端到端发现 ExecutionBinding 被错误用作 channel握手范围并修正。未知创建不重放、lost-stop保持写者、子进程/PID未知阻止释放、重复exec与client closure失败、越权归属/挂载/版本/共享/引擎等负例通过 |
+| OCI 代码/配方 | 新 entry实际 bundle 编译；Linux x64 直接执行被固定 `PODMAN_ACCOUNTLESS_BLOCKED` 拒绝，退出1，没有宿主CLI fallback。Containerfile/公开输入契约已写，真实镜像 **NOT_BUILT**，没有编造OCI digest |
+| 本提交 own-SHA CI | 推送后读取四组标准 CI，最终链接及结果写 Issue1 回执；不预写 Mac/包结果，不冒用旧提交摘要 |
+
+范围为根实施/自查与合成验证，**本轮没有独立审查者结论**。Podman process transport 与 OCI 内实际原生启动、Machine 配置/inspect字段兼容性、资源/文件/网络/跨 Bot canary/子写者负例、镜像复用和持久化/性能/备份恢复均需获准 Mac 重新取证。候选版本不是目标机已经受测版本。
+
+**仍有代码与实物前置：** 新保护准入的桌面首装接线、已验 provenance 的基础/CLI输入、真实 OCI build/digest/下载路径、每Run精确停止及一般任务重用、所需网关/细粒度网络/备份实现尚未交付。本切片提供受信 accountless factory，不把配置 Provider seam 当成默认 App 已能首装，也不把旧 NativePolicyAttestation 改名成 Podman 保护证明。取得设备授权本身不能填平这些实现缺口。
+
+本轮没有安装 Podman、启动 Machine/容器、拉取大镜像、生成管理密钥/持久凭据、触及用户 Mac、登录、调用模型、配置账单或发布镜像。后续先落实新的 Podman 具名设备/操作/资源/下载范围与对应代码，再验证原 Task A/B；A/B 另需具名 Connection/数据/计费准入。**全部 Podman live 门禁及 P1-B 仍未通过，P1 未完成。**

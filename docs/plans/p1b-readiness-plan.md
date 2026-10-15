@@ -1,5 +1,7 @@
 # P1-B 准备与推进计划
 
+**当前后端更新：** 用户已确认 [Podman ADR](../design/decisions/2026-10-16-podman-runtime.md)。默认本地路线改为 Podman CLI/Machine + 固定 OCI + 每 Bot 持久卷；执行 [首个无账号迁移切片](podman-first-slice.md)。下文旧 helper/Ubuntu/raw/EFI/外部 ARM64 制备步骤及旧 VM 授权包保留为历史，不再作为首发前置，也不再向用户请求旧制备机。Core/Runner/Connection/审批/验收通用要求保留，Mac 原生 verifier/App 构建保留。真实 Podman 首装和 Task A/B 尚待对应实现及新具名授权/证据。
+
 > 给 super bot / supper bot：复用现有 P1-A；使用 `superpowers:executing-plans` 按切片推进。延续最近报告中的单路集成方式，不默认增加并行模型任务；关键复审可独立、串行完成。本文不是新的总体架构。
 
 **Goal：** 从已验证的 P1-A 代码候选出发，关闭关键复审与首次安装缺口，在一个获准 Mac/VM 和一条获准 Connection 上完成 Task A/B、真实审批、隔离与恢复验收。

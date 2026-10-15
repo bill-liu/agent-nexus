@@ -25,3 +25,8 @@ test-results/
 coverage/
 *.log
 .superpowers/
+
+# Private local Podman inputs and generated OCI/build contexts
+.runtime-inputs/
+runtime/podman/context/
+*.oci.tar

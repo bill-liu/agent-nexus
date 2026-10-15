@@ -26,7 +26,7 @@ it.each([1,2] as const)('populated v%s migrates atomically to v3, retaining Core
  migrateCore(db);expect(db.prepare("SELECT value FROM core_metadata WHERE key='schema_version'").get()?.value).toBe(3);
  for(const [table,rows] of before)expect(db.prepare(`SELECT * FROM ${table}`).all()).toEqual(rows);
  expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);expect(db.prepare('PRAGMA foreign_keys').get()?.foreign_keys).toBe(1);
- for(const t of ['bot_provision','p1_bot_configuration','p1_run_request','p1_desktop_command','task_acceptance','evaluation'])expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(t)?.name).toBe(t);
+ for(const t of ['bot_provision','podman_sandbox_state','p1_bot_configuration','p1_run_request','p1_desktop_command','task_acceptance','evaluation'])expect(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(t)?.name).toBe(t);
  if(version===2)expect(db.prepare('SELECT binding FROM run_execution_binding').get()?.binding).toBe('{"kept":true}');
  db.prepare("UPDATE task SET status='SUCCEEDED' WHERE id='task'").run();
  db.prepare('INSERT INTO evaluation VALUES(?,?,?,?,?)').run('e','task','{}','digest',1);migrateCore(db);

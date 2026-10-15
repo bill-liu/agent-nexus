@@ -15,7 +15,8 @@ import type {Run} from './control.js';
 export type EnvironmentAction='inspect'|'create-sandbox'|'start-sandbox'|'connect'|'initialize-runtime'|'stop';
 export interface EnvironmentConfiguration {
  target:{targetId:string;botId:string;nodeId:string;sandboxId:string;generation:number;transportInstanceId:string;expiresAt:number};
- vmHelper:VMHelperTransport;
+ vmHelper?:VMHelperTransport;
+ sandboxProvider?:import('../../contracts/src/sandbox.js').SandboxProvider;
  /** owned=true permits only the original scoped cleanup after expiry/revocation. */
  assertAction(action:EnvironmentAction,owned?:boolean):void;
  connectRun(run:Run,sandboxId:string,assertCurrent:()=>void):Promise<InstalledRunChannel>;
@@ -23,11 +24,12 @@ export interface EnvironmentConfiguration {
 }
 /** Sole Core entry for supervised initialization, never a Task/model/login or installer. */
 export class P1EnvironmentInitializer {
- private readonly provider:MacOSVMProvider;
+ private readonly provider:import('../../contracts/src/sandbox.js').SandboxProvider;
  private readonly provisioner:BotProvisioner;
  private pending?:{digest:string;operationId:string;work:Promise<ProvisionRecord>};
  constructor(private readonly app:P1Application,private readonly options:EnvironmentConfiguration){
-  this.provider=new MacOSVMProvider(options.vmHelper);
+  if((options.vmHelper?1:0)+(options.sandboxProvider?1:0)!==1)throw Error('EXACTLY_ONE_SANDBOX_PROVIDER_REQUIRED');
+  this.provider=options.sandboxProvider??new MacOSVMProvider(options.vmHelper!);
   // adoptInstalled does not use the download seam; no second catalog/install path.
   this.provisioner=new BotProvisioner(app.core.database,this.provider);
  }

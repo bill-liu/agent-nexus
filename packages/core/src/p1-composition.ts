@@ -29,7 +29,7 @@ export interface P1InstalledConfiguration {
  /** Recheck protected named B admission at every operation; no environment/account autodiscovery. */
  assertAdmitted():void;
  prepareInstalled?:boolean;
- vmHelper:VMHelperTransport;downloads:DownloadManager;
+ vmHelper?:VMHelperTransport;sandboxProvider?:import('../../contracts/src/sandbox.js').SandboxProvider;downloads:DownloadManager;
  provisionRequest(botId:string,operationId:string,sandboxId:string):ProvisionRequest;
  connectRun(run:Run,sandboxId:string):Promise<InstalledRunChannel>;
  profile(run:Run):{
@@ -49,6 +49,7 @@ export interface P1InstalledConfiguration {
  * Loading a private configuration alone is not admission; each capability asserts its scoped authorization.
  */
 export function createInstalledP1Capabilities(app:P1Application,options:P1InstalledConfiguration):P1Capabilities {
+ if((options.vmHelper?1:0)+(options.sandboxProvider?1:0)!==1)throw Error('EXACTLY_ONE_SANDBOX_PROVIDER_REQUIRED');
  const routes=new Map<string,{channel:NodeRunnerChannel;binding:ExecutionBinding;auth:CodexAuthAdapter;installed:InstalledRunChannel;botId:string;nativeStarted:boolean}>();
  const commandRoutes=new Map<string,NodeRunnerChannel>();
  const workers=new Map<string,VerificationWorker>();
@@ -74,7 +75,7 @@ export function createInstalledP1Capabilities(app:P1Application,options:P1Instal
   // Receipt loss can replay metadata; Core persisted cursor makes it idempotent.
   await channel.acknowledgeSpool(entries.at(-1)!.cursor);
  };
- const provisioner=new BotProvisioner(app.core.database,new MacOSVMProvider(options.vmHelper),options.downloads);
+ const provisioner=new BotProvisioner(app.core.database,options.sandboxProvider??new MacOSVMProvider(options.vmHelper!),options.downloads);
  const capabilities:P1Capabilities={
   assertAdmitted:options.assertAdmitted,
   provisioner,provisionRequest:options.provisionRequest,

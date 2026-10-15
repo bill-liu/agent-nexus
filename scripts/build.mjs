@@ -10,6 +10,7 @@ for (const [entry, name] of [
   ['packages/desktop-platform/src/secrets.ts', 'protected-secrets'],
   ['apps/verification-worker/src/macos-executor.ts', 'verifier-compiler'],
   ['apps/node-agent/src/p1-bootstrap.ts', 'guest-node'],
+  ['apps/node-agent/src/podman-entry.ts', 'podman-entry'],
 ]) {
   await build({ entryPoints: [entry], outfile: `build/${name}.cjs`, bundle: true,
     platform: 'node', format: 'cjs', target: 'node24', external: ['electron', 'node:*', 'esbuild'], sourcemap: false });

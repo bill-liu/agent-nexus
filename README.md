@@ -7,7 +7,9 @@
 **Electron · Mac-first · 本地控制 · Sandbox 执行**
 
 > **开发状态：P1-A 代码与无账号验证材料已交付，P1-B 真实联调尚未通过。**
-> 现在可以从源码运行演示和准备界面；不能据此认为真实 Bot 已经可用。真实 VM、CLI 登录、连续任务和部分独立复审仍待完成。第一期仅支持 Mac 客户端，不是浏览器管理网站，也不是已发布的生产版本。
+> 现在可以从源码运行演示和准备界面；不能据此认为真实 Bot 已经可用。Podman Machine/容器真实联调、CLI 登录、连续任务和部分独立复审仍待完成。第一期仅支持 Mac 客户端，不是浏览器管理网站，也不是已发布的生产版本。
+
+当前默认本地后端已选定 [Podman](docs/design/decisions/2026-10-16-podman-runtime.md)；首个 [无账号代码切片](docs/plans/podman-first-slice.md) 仅有合成验证，尚非已安装可用环境。
 
 [当前进展](#当前进展) · [从源码运行](#从源码运行) · [下一步计划](docs/plans/p1b-readiness-plan.md) · [技术设计](docs/design/v1.3/technical-design.md) · [交互设计](docs/design/v1.3/interaction-design.md)
 

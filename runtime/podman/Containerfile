@@ -1,0 +1,17 @@
+# A private build recipe, not a built/published image. BASE_IMAGE must be a reviewed immutable arm64 Node 24.19.0 digest.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG IMAGE_VERSION
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      io.agent-nexus.protocol="2" \
+      io.agent-nexus.codex="0.159.2"
+COPY --chown=0:0 --chmod=0444 podman-entry.cjs /opt/an/podman-entry.cjs
+COPY --chown=0:0 --chmod=0555 codex /opt/an/bin/codex
+COPY --chown=0:0 --chmod=0444 runtime.json /opt/an/runtime.json
+RUN mkdir -p /an/work /an/private && chown 1000:1000 /an/work /an/private && chmod 0700 /an/work /an/private
+USER 1000:1000
+WORKDIR /an/work
+ENTRYPOINT ["/usr/local/bin/node", "/opt/an/podman-entry.cjs"]
+CMD ["idle"]

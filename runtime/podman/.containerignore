@@ -1,0 +1,5 @@
+*
+!Containerfile
+!podman-entry.cjs
+!codex
+!runtime.json
